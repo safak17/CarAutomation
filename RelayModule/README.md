@@ -1,4 +1,6 @@
 # RelayModule Library for Arduino
+![RelayModule](Photos/RelayModule.gif)<br><br><br>
+
 ## O. What is RelayModule Library? If I use it, how easier life will be ?
 If you have made some Arduino project with Relay Modules, you probably wrote some **scattered code** for relays.<br>
 
@@ -9,10 +11,10 @@ If you have made some Arduino project with Relay Modules, you probably wrote som
     int Relay2 = 4;
     int Relay3 = 3;
     int Relay4 = 2;
-    pinMode(Relay1, "OUTPUT");
-    pinMode(Relay2, "OUTPUT");
-    pinMode(Relay3, "OUTPUT");
-    pinMode(Relay4, "OUTPUT");
+    pinMode(Relay1, OUTPUT);
+    pinMode(Relay2, OUTPUT);
+    pinMode(Relay3, OUTPUT);
+    pinMode(Relay4, OUTPUT);
 **Scattered Code Example 2:** You should know *logic type* of the Relay Module.<br>
 **"When a relay is activated?"** question will give the answer about *logic type.*<br>
 If a relay is activated with `digitalWrite(pin, LOW)`, that means Relay Module is working with **LOW** logic.<br>
@@ -54,7 +56,7 @@ After clicking it, those two lines below automatically will be added to the sour
 
 ## 3. How to use RelayModule Library ?
 ### 3.1 Creating RelayModule Instance
-`RelayModule module(4, "LOW");`<br>
+`RelayModule module(4, LOW);`<br>
 We have specified that there are **4 relays** on this Relay Module and it is working with **LOW** logic.<br>
 Working with **LOW logic** specifies that **relays will be activated** when `digitalWrite(pin, LOW)` is executed.<br>
 <br>
@@ -64,15 +66,15 @@ As an example, look at the figure below! **Arduino Uno and 4 Relay Module are co
 ![Arduino_Uno_4_RelayModule_Example](Photos/Arduino_Uno_and_4Relay_Module.png)<br>
 <br>
 If we have those connections, we need to set the Relay Module's pins as:<br>
-`module[1].setPin(5).setPinMode("OUTPUT")` &nbsp;&nbsp;&nbsp;&nbsp;1st relay **(IN1)** is connected to the Arduino's **Digital5** pin. The green wire.<br>
-`module[2].setPin(4).setPinMode("OUTPUT")` &nbsp;&nbsp;&nbsp;&nbsp;2nd relay **(IN2)** is connected to the Arduino's **Digital4** pin. The blue wire.<br>
-`module[3].setPin(3).setPinMode("OUTPUT")` &nbsp;&nbsp;&nbsp;&nbsp;3rd relay **(IN3)** is connected to the Arduino's **Digital3** pin. The yellow wire.<br>
-`module[4].setPin(2).setPinMode("OUTPUT")` &nbsp;&nbsp;&nbsp;&nbsp;4th relay **(IN4)** is connected to the Arduino's **Digital2** pin. The red wire.<br>
+`module[1].setPinNumber(5).setPinMode(OUTPUT);` &nbsp;&nbsp;&nbsp;&nbsp;1st relay **(IN1)** is connected to the Arduino's **Digital5** pin. Green.<br>
+`module[2].setPinNumber(4).setPinMode(OUTPUT);` &nbsp;&nbsp;&nbsp;&nbsp;2nd relay **(IN2)** is connected to the Arduino's **Digital4** pin. Brown.<br>
+`module[3].setPinNumber(3).setPinMode(OUTPUT);` &nbsp;&nbsp;&nbsp;&nbsp;3rd relay **(IN3)** is connected to the Arduino's **Digital3** pin. Yellow.<br>
+`module[4].setPinNumber(2).setPinMode(OUTPUT);` &nbsp;&nbsp;&nbsp;&nbsp;4th relay **(IN4)** is connected to the Arduino's **Digital2** pin. Orange.<br>
 
-`module[1].setPin(5).setPinMode("OUTPUT");` <br>
+`module[1].setPinNumber(5).setPinMode(OUTPUT);` <br>
 **module[1]** specifies the module's first relay. (Be careful not try to reach first relay with **module[0]** )<br>
-**setPin(5)** specifies that relay is connected with Arduino's **Digital5** pin.<br>
-**setPinMode("OUTPUT")** specifies that Arduino's **Digital5** pin will be used in **OUTPUT** mode.<br>
+**setPinNumber(5)** specifies that relay is connected with Arduino's **Digital5** pin.<br>
+**setPinMode(OUTPUT)** specifies that Arduino's **Digital5** pin will be used on **OUTPUT** mode.<br>
 <br>
 
 ### 3.3 All Functions of RelayModule
@@ -84,14 +86,14 @@ If we have those connections, we need to set the Relay Module's pins as:<br>
         <th><b>Example</b></th>
     </tr>
     <tr>
-        <td> module( relayNumber, lowOrHigh ); </td>
+        <td> module( channelNumber, logic ); </td>
         <td> Initiates the relay module. </td>
-        <td> module( 4 , LOW );<br>Activates the fourth relay. </td>
+        <td> module( 4 , LOW );<br> It is 4 channel relay module which is working with LOW logic. </td>
     </tr>
     <tr>
         <td> module.active( relayNumber ); </td>
         <td> Activates the relay.</td>
-        <td> module.active(4);<br>Activates the fourth relay. </td>
+        <td> module.active(3);<br>Activates the third relay. </td>
     </tr>
     <tr>
         <td> module.activeAll(); </td>
@@ -100,7 +102,7 @@ If we have those connections, we need to set the Relay Module's pins as:<br>
     <tr>
         <td> module.deactive( relayNumber ); </td>
         <td> Deactivates the relay.</td>
-        <td> module.active(1);<br>Deativates the first relay. </td>
+        <td> module.deactive(1);<br>Deactivates the first relay. </td>
     </tr>
     <tr>
         <td> module.deactiveAll(); </td>
@@ -108,8 +110,12 @@ If we have those connections, we need to set the Relay Module's pins as:<br>
     </tr>
     <tr>
         <td> module.getStatus(); </td>
-        <td> Returns the status of relays as integer type. </td>
+        <td> Returns the status of relays as integer. </td>
         <td> Status: 7 <br> 7 = 0 + 4 + 2 + 1 <br> Specifies that Relay 1,2, 3 are active and Relay4 is deactive. </td>
     </tr>
     
 </table>
+
+## 4 Talk Is Cheap, Show Me The Code
+![RelayModuleExample](Photos/Talk_Is_Cheap_Show_Me_The_Code.png)<br><br><br>
+
