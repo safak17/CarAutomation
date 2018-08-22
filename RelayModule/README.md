@@ -40,19 +40,17 @@ After downloading RelayModule folder, you should place it to the **libraries** f
 <br>
 For me, this libraries folder is located in: <br>
 **/Users/safakakinci/Documents/Arduino/libraries/RelayModule** <br>
-![MacbookPro Arduino Libraries Folder](Photos/Adding RelayModule Library to the Arduino Libraries Folder.png) <br><br>
+![Adding_RelayModule_Library](Photos/Adding_RelayModule_Library_To_The_Arduino_Libraries_Folder.png)<br><br><br>
 <br><br><br>
 ## 2. Importing RelayModule Library to the Arduino Project Source Code
 On the menu bar, you are going to see **Include Library** which is located under the **Sketch** tab.<br>
 Click **RelayModule** which is at the bottom of **Include Library** pane.<br>
 
-![MacbookPro Arduino Libraries Folder](Photos/Importing RelayModule Library to the Arduino Source Code.png) <br><br>
+![Importing_RelayModule_Library](Photos/Importing_RelayModule_Library_To_The_Arduino_Source_Code.png)<br><br><br>
 
 
 After clicking it, those two lines below automatically will be added to the source code.<br>
-![Include Libraries](Photos/Importing RelayModule Library to the Arduino Source Code_2.png)
-<br>
-<br>
+![Importing_RelayModule_Library](Photos/Importing_RelayModule_Library_To_The_Arduino_Source_Code_2.png)<br><br><br>
 
 ## 3. How to use RelayModule Library ?
 ### 3.1 Creating RelayModule Instance
@@ -80,41 +78,34 @@ If we have those connections, we need to set the Relay Module's pins as:<br>
 ### 3.3 All Functions of RelayModule
 
 <table>
-
     <tr>
         <th width=30%><b>Functions</b></th>
         <th width=40%><b>Explanation</b></th>
         <th><b>Example</b></th>
     </tr>
-    
     <tr>
         <td> module( relayNumber, lowOrHigh ); </td>
         <td> Initiates the relay module. </td>
         <td> module( 4 , LOW );<br>Activates the fourth relay. </td>
     </tr>
-    
     <tr>
         <td> module.active( relayNumber ); </td>
         <td> Activates the relay.</td>
         <td> module.active(4);<br>Activates the fourth relay. </td>
     </tr>
-    
     <tr>
         <td> module.activeAll(); </td>
         <td> Activates all relays on the Relay Module.</td>
     </tr>
-    
     <tr>
         <td> module.deactive( relayNumber ); </td>
         <td> Deactivates the relay.</td>
         <td> module.active(1);<br>Deativates the first relay. </td>
     </tr>
-    
     <tr>
         <td> module.deactiveAll(); </td>
         <td> Deactivates all relays on the Relay Module. </td>
     </tr>
-    
     <tr>
         <td> module.getStatus(); </td>
         <td> Returns the status of relays as integer type. </td>
