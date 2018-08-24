@@ -22,7 +22,7 @@ String displayRTCTime()
 
   return (  "Year: "    + String(rtcTime.Year + 1970) + "\n"  //  Here rtcTime.Year will return 48. Because, time is offset from 1970.
             "Month: "   + String(rtcTime.Month) + "\n"
-            "Day: "     + String(rtcTime.Day) + "\n"
+            "Day: "     + String(rtcTime.Day) + "(" + String(rtcTime.Wday) + ")\n"
             "Hour: "    + String(rtcTime.Hour) + "\n"
             "Minute: "  + String(rtcTime.Minute) + "\n"
             "Second: "  + String(rtcTime.Second) + "\n" );

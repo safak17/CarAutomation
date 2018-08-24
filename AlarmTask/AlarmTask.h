@@ -1,3 +1,6 @@
+#ifndef ALARMTASK_H
+#define ALARMTASK_H
+
 #define REPEAT_MASK 0x8000
 #define DAY_OF_WEEK_MASK 0x7000
 #define HOUR_MASK 0x0F80
@@ -109,3 +112,5 @@ public:
                  minute()     ==   rhs.minute()   )?     true    :   false;
     }
 };
+
+#endif

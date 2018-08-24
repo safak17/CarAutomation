@@ -29,7 +29,7 @@ void setup()
   digitalWrite(LED_BUILTIN, HIGH);                                  //  Arduino uyanıksa 13. led yanacak.
 
   setRelayModule();                                                 //  Pinleri ayarlar ve başlangıçta röleleri kapatır.
-  setInterruptPin2ForRTC();                                         //  RTC'dan interrupt gelebilmesi için Digital2 pini ayarlanır.
+  SetInterruptPin2ForRTC();                                         //  RTC'dan interrupt gelebilmesi için Digital2 pini ayarlanır.
   SetDefaultValuesOfRTC();                                          //  Alarm Registerlarına default değerler yüklendi.
   SleepNow();
 }
@@ -101,7 +101,11 @@ void serialEvent()                                                              
     else if ( receivedBluetoothData.startsWith("a") )                                     //  Eğer receivedBluetoothData'deki veri "a" ile başlıyorsa...    (a)larm
     {
       if (receivedBluetoothData.charAt(1) == 's' )
-        AlarmSet( receivedBluetoothData.substring(3, receivedBluetoothData.indexOf(";")) );             //  AlarmSet( AlarmDescription );
+      {
+        String AlarmDescription = receivedBluetoothData.substring(3, receivedBluetoothData.indexOf(";"));
+        AlarmSet( AlarmDescription );             //  AlarmSet( AlarmDescription );
+      }
+        
 
       else if (receivedBluetoothData.charAt(1) == 'd' )
         AlarmDisarm( receivedBluetoothData.substring(2, receivedBluetoothData.indexOf(";")).toInt() );  //  AlarmDisarm( alarmId );
@@ -120,7 +124,7 @@ void serialEvent()                                                              
 }//end serialEvent()
 
 
-void setInterruptPin2ForRTC()
+void SetInterruptPin2ForRTC()
 {
   pinMode(2, INPUT_PULLUP);
   attachInterrupt( digitalPinToInterrupt( 2 ), alarmFunction, CHANGE );
@@ -283,7 +287,8 @@ time_t getDateTimeAsSeconds(String& DateTime)
 
 void ClockSet( String& DateTime )
 {
-  if( RTC.set( getDateTimeAsSeconds( DateTime ) ) == 0 )
+  bool isSet = RTC.set( getDateTimeAsSeconds( DateTime ) );
+  if( isSet == 0 )
     Serial.println("OK: CLOCK_SET ;");
   else
     Serial.println("ERROR: CLOCK_SET ;");
@@ -298,7 +303,7 @@ void ClockGet()
                     String( rtcTime.Day         ) + " " +
                     String( rtcTime.Hour        ) + " " +
                     String( rtcTime.Minute      ) + " " +
-                    String( rtcTime.Second      ) + " ;";
+                    String( rtcTime.Second      ) ;
 
   Serial.println("OK: CLOCK_GET "+ RTCTime +" ;" );
   //Serial.println("DAY:" + DayDate( rtcTime.Wday ));
