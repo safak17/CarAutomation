@@ -18,7 +18,7 @@ private:
     uint16_t    alarmTask;
     
 public:
-    //  AlarmTask( uint16_t alarmId ):alarmTask(0), alarmId(alarmId){};
+    AlarmTask( uint16_t alarmId ):alarmTask(0), alarmId(alarmId){};
     
     //  Space is the indicator.
     //  String alarmDescription = "id repeat dayOfWeek hour minute relayNumber relayStatus";
@@ -73,7 +73,7 @@ public:
                 String( hour()          ) + " " +
                 String( minute()        ) + " " +
                 String( relayNumber()   ) + " " +
-                String( relayStatus()   ));
+                String( relayStatus()   ) + " ;");
     }
     
     bool operator< (const AlarmTask& rhs) const
