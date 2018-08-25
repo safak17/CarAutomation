@@ -7,7 +7,7 @@
 ## O. Arduino Sleep Idle Mode Example
 ![IdleModeExample](Photos/IdleModeExample.png)<br><br><br>
 
-REFERENCE: https://playground.arduino.cc/Learning/arduinoSleepCode
-REFERENCE: https://www.nongnu.org/avr-libc/user-manual/modules.html
-REFERENCE: https://www.nongnu.org/avr-libc/user-manual/group__avr__sleep.html
-REFERENCE: https://www.nongnu.org/avr-libc/user-manual/group__avr__power.html
+REFERENCE: https://playground.arduino.cc/Learning/arduinoSleepCode <br>
+REFERENCE: https://www.nongnu.org/avr-libc/user-manual/modules.html <br>
+REFERENCE: https://www.nongnu.org/avr-libc/user-manual/group__avr__sleep.html <br>
+REFERENCE: https://www.nongnu.org/avr-libc/user-manual/group__avr__power.html <br>
