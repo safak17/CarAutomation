@@ -58,7 +58,7 @@ public:
     }
     
     void     setId( uint16_t id )    {  alarmId = id;                                                                 }
-    uint16_t getId()         const   {   return ( alarmId );                                                          }
+    uint16_t id()            const   {   return ( alarmId );                                                          }
     
     uint16_t isRepeat()      const   {   return ( alarmTask & REPEAT_MASK )         / DIGIT_VALUE_REPEAT;             }
     uint16_t day()           const   {   return ( alarmTask & DAY_OF_WEEK_MASK )    / DIGIT_VALUE_DAY_OF_WEEK;        }
@@ -70,7 +70,7 @@ public:
     
     String getDescription()
     {
-        return (  String( alarmId         ) + " " +
+        return (String( alarmId         ) + " " +
                 String( isRepeat()      ) + " " +
                 String( day()           ) + " " +
                 String( hour()          ) + " " +

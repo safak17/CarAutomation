@@ -45,6 +45,7 @@ void loop()
     {
       AlarmTask& triggeredAlarm  =   currentAlarmIterator.current().info();         //  Tetiklenen alarmın bilgilerini al.  (Referans olarak, kopyalamaya gerek yok.)
       RelayOperate( triggeredAlarm.relayNumber(), triggeredAlarm.relayStatus() );   //  Gerekli röle işlemlerini yap.
+      Serial.println("OK: ALARM_TRIGGERED " + String(triggeredAlarm.id()) + " ;");
 
       if ( ! triggeredAlarm.isRepeat() )  alarmList.remove( currentAlarmIterator.current().info() );    //  Tekrar etmeyen alarm ise, listeden çıkar.
 
@@ -68,6 +69,9 @@ void serialEvent()                                                              
 
   while ( receivedBluetoothData.endsWith(" ;") )                                         //  Birden fazla komut tek satırda gelebilir.
   {
+    //  Burada, komutu alman gerek. OK, ERROR kelimelerini çıkaracaksın.
+    //  Sonra startsWith ile kontrol edeceksin.
+    //  En sonda trim yapacaksın.
     if( receivedBluetoothData.startsWith("r") )                                     //  Eğer receivedBluetoothData'deki veri "r" ile başlıyorsa...    (r)elay
     {
       if( receivedBluetoothData.charAt(1) == 'o' )  //  ro 3 1;
@@ -105,7 +109,7 @@ void serialEvent()                                                              
         String AlarmDescription = receivedBluetoothData.substring(3, receivedBluetoothData.indexOf(";"));
         AlarmSet( AlarmDescription );             //  AlarmSet( AlarmDescription );
       }
-        
+
 
       else if (receivedBluetoothData.charAt(1) == 'd' )
         AlarmDisarm( receivedBluetoothData.substring(2, receivedBluetoothData.indexOf(";")).toInt() );  //  AlarmDisarm( alarmId );
@@ -195,11 +199,11 @@ void PeripheralGet()
 {
   String feeder;
   feeder  +=  String(module.getStatus())  + " ";            //Relay's Status
+  feeder  +=  getTemperatureValue()       + " ";            //Analog Temperature Value
   feeder  +=  getCurrentValue()           + " ";            //Analog Current Value
   feeder  +=  getVoltageValue()           + " ";            //Analog Voltage Value
-  feeder  +=  getTemperatureValue();      + " ";            //Analog Temperature Value
 
-  Serial.println("OK: PERIPHERAL_GET "+ feeder +" ;" );
+  Serial.println("OK: PERIPHERAL_GET "+ feeder +";" );
 }//end PeripheralGet()
 
 String getCurrentValue()
@@ -359,11 +363,11 @@ void AlarmDisarm( uint8_t alarmId )
 
 void AlarmList()
 {
-  Serial.println("OK: ALARM_LIST " + String( alarmList.size()) + " ;");
+  Serial.println("OK: ALARM_LIST_SIZE " + String( alarmList.size()) + " ;");
 
   CircularList<AlarmTask>::iterator it;
   for ( it = alarmList.begin();  it.position() < alarmList.size(); it++  )
-    Serial.println( it.current().info().getDescription() );
+    Serial.println("OK: ALARM_LIST_ITEM " + it.current().info().getDescription() );
 
 }
 
