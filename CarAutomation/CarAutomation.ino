@@ -1,42 +1,44 @@
+#include <DS3232RTC.h>                                              //  RealTimeClock Library   https://github.com/JChristensen/DS3232RTC
+#include <AlarmTask.h>                                              //  To save alarms as AlarmTask format.
+#include <avr/power.h>                                              //  To reduce power consumption.
+#include <avr/sleep.h>                                              //  To use sleep_mode functions.
+
+#include <SoftwareSerial.h>                                         //  https://www.arduino.cc/en/Reference/SoftwareSerial
+SoftwareSerial BluetoothSerial(0, 1);                               //  Arduino's ( RX | 0 ) &&  ( TX | 1 )
+
 #include </Users/safakakinci/Documents/Arduino/libraries/CircularList/CircularList.cpp>
-#include <SoftwareSerial.h>                                         //  Bluetooth modülün bağlı olduğu (0,1) (RX,TX) bacaklarından gelen veriyi de 9600 ayarlabilmek için.
-#include <DS3232RTC.h>                                              //  https://github.com/JChristensen/DS3232RTC
-#include <AlarmTask.h>                                              //  Alarmlı Görev oluşturabilmek için.
-#include <RelayModule.h>                                            //  Röle modülü kontrol etmek için.
-#include <avr/power.h>                                              //  Güç tüketimini azaltmak için gerekli bazı fonksiyonlar...
-#include <avr/sleep.h>                                              //  Sleep mode fonksiyonlarını kullanabilmek için.
+CircularList<AlarmTask> alarmList;                                  //  Alarms will be added to the alarmList.
+CircularList<AlarmTask>::iterator currentAlarmIterator;             //  To hold the current alarm in the alarmList.
 
-#define ARDUINO_ANALOG_CURRENT              3                       //  Akım değeri,      Arduino'nun Analog 3 pininden gelecek.
-#define ARDUINO_ANALOG_VOLTAGE              4                       //  Voltaj değeri,    Arduino'nun Analog 4 pininden gelecek.
-#define ARDUINO_ANALOG_TEMPERATURE          2                       //  Sıcaklık değeri,  Arduino'nun Analog 2 pininden gelecek.
+#include <RelayModule.h>                                            //  To control relay module "easily".
+RelayModule module(4, LOW);                                         //  It is a 4 channel relay module and it is working with ACTIVE LOW logic.
 
-#define SMOOTH_CALCULATION_FREQUENCY_NUMBER 8                       //  SmoothCalculation fonksiyonunda 8 tane ölçüm yapılıyor.
 
-String                          receivedBluetoothData = "";         //  Android tarafından gönderilen veriyi tutmak için...
 
-SoftwareSerial                  BluetoothSerial(0, 1);              //  Arduino'nun 0 bacağı RX; Arduino'nun 1 bacağı TX
-RelayModule                     module(4, LOW);                     //  Relay kartında dört tane rölenin olduğunu ve bu kartın ACTIVE LOW ile çalıştığını belirtiyoruz.
-CircularList<AlarmTask> alarmList;                                  //  Alarmları sıralı bir şekilde içinde tutacak liste.
-CircularList<AlarmTask>::iterator currentAlarmIterator;
+#define ARDUINO_ANALOG_TEMPERATURE          2                       //  Temperature value will be read from Arduino's Analog Pin 2.
+#define ARDUINO_ANALOG_CURRENT              3                       //  Current value     will be read from Arduino's Analog Pin 3.
+#define ARDUINO_ANALOG_VOLTAGE              4                       //  Voltage value     will be read from Arduino's Analog Pin 4.
+#define SMOOTH_CALCULATION_FREQUENCY_NUMBER 8                       //  Reads eight times the voltage value from Arduino Analog Pin 4 in every 50 ms and then returns the average of total measurement.
 
+String receivedBluetoothData = "";                                  //  To hold the data which is sent by Android.
 
 void setup()
 {
-  Serial.begin(9600);                                               //  9600bps hız ile RX ve TX bacaklarından veri gelecek.
-  BluetoothSerial.begin(9600);                                      //  9600bps hız ile RX ve TX bacaklarından veri gelecek.
+  Serial.begin(9600);                                               //  Arduino's baud rate is set to 9600.
+  BluetoothSerial.begin(9600);                                      //  HC-05's (BluetoothModule) baud rate is set to 9600.
+  analogReference(DEFAULT);                                         //  Configures the reference voltage used for analog input, Arduino Uno 5V
 
-  pinMode(LED_BUILTIN, OUTPUT);                                     //  Arduino uyanıksa 13. led yanacak.
-  digitalWrite(LED_BUILTIN, HIGH);                                  //  Arduino uyanıksa 13. led yanacak.
+  pinMode(LED_BUILTIN, OUTPUT);                                     //  If Arduino is awake, the built-in led will be turned on.
+  digitalWrite(LED_BUILTIN, HIGH);                                  //  If Arduino is awake, the built-in led will be turned on.
 
-  setRelayModule();                                                 //  Pinleri ayarlar ve başlangıçta röleleri kapatır.
-  SetInterruptPin2ForRTC();                                         //  RTC'dan interrupt gelebilmesi için Digital2 pini ayarlanır.
-  SetDefaultValuesOfRTC();                                          //  Alarm Registerlarına default değerler yüklendi.
+  SetRelayModule();                                                 //  Sets the relay module pins and deactivates all the relays.
+  SetInterruptPin2ForRTC();                                         //  If an alarm is triggered, the interrupt will come to Arduino Digital Pin 2.
+  SetDefaultValuesOfRTC();
   SleepNow();
 }
 
 void loop()
 {
-
   if ( RTC.alarm( ALARM_2 ) )
   {
     AlarmTask& triggeredAlarm = currentAlarmIterator.current().info();
@@ -58,71 +60,40 @@ void loop()
 
 
     UpdateAlarm2RegisterOfRTC();                                                        //  ... ve alarm registerini güncelle.
-
     SleepNow();
   }// if ( RTC.alarm( ALARM_2 ) )
 }// loop()
 
-void serialEvent()                                                                      //  Receive serial buffer'da veri varsa, otomatik olarak bu fonksiyon çağrılır.
+
+void serialEvent()                                        //  Called when data is available.                          https://www.arduino.cc/en/Reference/SerialEvent
 {
-  receivedBluetoothData = Serial.readString();                                          //  Tampondaki verileri oku ve receivedBluetoothData içine kaydet.
+  receivedBluetoothData = Serial.readString();            //  Reads characters from the serial buffer into a string.  https://www.arduino.cc/en/Serial/ReadString
 
-  if( !receivedBluetoothData.endsWith(" ;") )
-    Serial.println("ERROR: RECEIVED_DATA_FORMAT ;");
-
-  while ( receivedBluetoothData.endsWith(" ;") )                                         //  Birden fazla komut tek satırda gelebilir.
+  while ( receivedBluetoothData.endsWith(" ;") )          //  There can be many commands in the buffer.
   {
-    //  Burada, komutu alman gerek. OK, ERROR kelimelerini çıkaracaksın.
-    //  Sonra startsWith ile kontrol edeceksin.
-    //  En sonda trim yapacaksın.
-    if( receivedBluetoothData.startsWith("r") )                                     //  Eğer receivedBluetoothData'deki veri "r" ile başlıyorsa...    (r)elay
-    {
-      if( receivedBluetoothData.charAt(1) == 'o' )  //  ro 3 1;
-      {
-        uint8_t relayNumber =   (receivedBluetoothData.charAt(3) - '0');  //  In order to cast character to integer, we substracted '0' from character.
-        uint8_t relayStatus =   (receivedBluetoothData.charAt(5) - '0');  //  In order to cast character to integer, we substracted '0' from character.
-        RelayOperate( relayNumber, relayStatus );
-      }
-      else if (receivedBluetoothData.charAt(1) == 's' )
-        RelaysStatus();
-      else
-        Serial.println("ERROR: RELAY_FORMAT ;");
-    }// receivedBluetoothData.startsWith("r")
-
-    else if   ( receivedBluetoothData.startsWith("p") )                                     //  Eğer receivedBluetoothData'deki veri "c" ile başlıyorsa...    (c)lock
+    if ( receivedBluetoothData.startsWith("pg"))
       PeripheralGet();
 
-    else if ( receivedBluetoothData.startsWith("c") )                                     //  Eğer receivedBluetoothData'deki veri "c" ile başlıyorsa...    (c)lock
-    {
-      if (receivedBluetoothData.charAt(1) == 's' )
-      {
-        String DateTime = receivedBluetoothData.substring(3, receivedBluetoothData.indexOf(" ;"));
-        ClockSet( DateTime );
-      }
-      else if (receivedBluetoothData.charAt(1) == 'g' )
-        ClockGet();
-      else
-        Serial.println("ERROR: CLOCK_FORMAT ;");
-    }// receivedBluetoothData.startsWith("c")
+    else if ( receivedBluetoothData.startsWith("cg"))
+      ClockGet();
 
-    else if ( receivedBluetoothData.startsWith("a") )                                     //  Eğer receivedBluetoothData'deki veri "a" ile başlıyorsa...    (a)larm
-    {
-      if (receivedBluetoothData.charAt(1) == 's' )
-      {
-        String AlarmDescription = receivedBluetoothData.substring(3, receivedBluetoothData.indexOf(";"));
-        AlarmSet( AlarmDescription );             //  AlarmSet( AlarmDescription );
-      }
+    else if ( receivedBluetoothData.startsWith("cs"))
+      ClockSet( receivedBluetoothData.substring(3, receivedBluetoothData.indexOf(" ;")) );              //  ClockSet( DateTime )
 
+    else if ( receivedBluetoothData.startsWith("ro"))
+      RelayOperate( (receivedBluetoothData.charAt(3) - '0'), (receivedBluetoothData.charAt(5) - '0') ); //  RelayOperate( relayNumber, relayStatus )
 
-      else if (receivedBluetoothData.charAt(1) == 'd' )
-        AlarmDisarm( receivedBluetoothData.substring(2, receivedBluetoothData.indexOf(";")).toInt() );  //  AlarmDisarm( alarmId );
+    else if ( receivedBluetoothData.startsWith("rs"))
+      RelaysStatus();
 
-      else if (receivedBluetoothData.charAt(1) == 'l' )
-        AlarmList();
+    else if ( receivedBluetoothData.startsWith("as"))
+      AlarmSet( receivedBluetoothData.substring(3, receivedBluetoothData.indexOf(" ;")) );               //  AlarmSet( AlarmDescription );
 
-      else
-        Serial.println("ERROR: ALARM_FORMAT ;");
-    }// receivedBluetoothData.startsWith("a")
+    else if ( receivedBluetoothData.startsWith("ad"))
+      AlarmDisarm( receivedBluetoothData.substring(2, receivedBluetoothData.indexOf(" ;")).toInt() );    //  AlarmDisarm( alarmId );
+
+    else if ( receivedBluetoothData.startsWith("al"))
+      AlarmList();
 
     receivedBluetoothData = receivedBluetoothData.substring( receivedBluetoothData.indexOf(";") + 1);
   }//end while ( receivedBluetoothData.endsWith(" ;") )
@@ -139,9 +110,9 @@ void SetInterruptPin2ForRTC()
 
 void SleepNow()
 {
-  delay(200);                       //  CPU'nun uyuyabilmesi için gerekli olan KRİTİK bekleme.
-  set_sleep_mode(SLEEP_MODE_IDLE);  // Sleep Mode is set to SLEEP_MODE_IDLE
-  sleep_enable();                   // Enables the sleep bit in the mcucr register
+  delay(200);
+  set_sleep_mode(SLEEP_MODE_IDLE);  //  Sleep Mode is set to SLEEP_MODE_IDLE
+  sleep_enable();                   //  Enables the sleep bit in the mcucr register
 
   power_adc_disable();
   power_spi_disable();
@@ -150,9 +121,9 @@ void SleepNow()
   power_timer2_disable();
   power_twi_disable();
 
-  digitalWrite(LED_BUILTIN, LOW);   //  Cihazın uykuya daldığını göstermek için.
-  sleep_mode();                     // Here, the device is actually put to sleep!
-  digitalWrite(LED_BUILTIN, HIGH);  //  Cihazın uyumadığını göstermek için.
+  digitalWrite(LED_BUILTIN, LOW);   //  To show that Arduino is sleeping.
+  sleep_mode();                     //  Here, the device is actually put to sleep!
+  digitalWrite(LED_BUILTIN, HIGH);  //  To show that Arduino is NOT sleeping.
 
   sleep_disable();                  // First thing after waking from sleep:  disable sleep...
   power_all_enable();
@@ -164,13 +135,13 @@ void SleepNow()
 
 
 /***************                Relay                ***************/
-void setRelayModule()
+void SetRelayModule()
 {
-  module[1].setPinNumber(7).setPinMode(OUTPUT);       //  Relay1 (IN1), Arduino'nun Digital 7 pinine bağlı.
-  module[2].setPinNumber(6).setPinMode(OUTPUT);       //  Relay2 (IN2), Arduino'nun Digital 6 pinine bağlı.
-  module[3].setPinNumber(5).setPinMode(OUTPUT);       //  Relay3 (IN3), Arduino'nun Digital 5 pinine bağlı.
-  module[4].setPinNumber(4).setPinMode(OUTPUT);       //  Relay4 (IN4), Arduino'nun Digital 4 pinine bağlı.
-  module.deactiveAll();                               //  Başlangıçta bütün rölelerin kapatılması gerekir, kararsız durumda bırakmamak için.
+  module[1].setPinNumber(7).setPinMode(OUTPUT);       //  Relay1 (IN1) is connected to the Arduino's digital pin 7.
+  module[2].setPinNumber(6).setPinMode(OUTPUT);       //  Relay2 (IN2) is connected to the Arduino's digital pin 6.
+  module[3].setPinNumber(5).setPinMode(OUTPUT);       //  Relay3 (IN3) is connected to the Arduino's digital pin 5.
+  module[4].setPinNumber(4).setPinMode(OUTPUT);       //  Relay4 (IN4) is connected to the Arduino's digital pin 4.
+  module.deactiveAll();                               //  At the beginning, deactivates all the relays.
 }
 
 void RelayOperate( uint8_t relayNumber, uint8_t relayStatus )
@@ -200,35 +171,33 @@ void RelaysStatus()
 /***************                Peripheral                ***************/
 void PeripheralGet()
 {
-  String feeder;
-  feeder  +=  String(module.getStatus())  + " ";            //Relay's Status
-  feeder  +=  getTemperatureValue()       + " ";            //Analog Temperature Value
-  feeder  +=  getCurrentValue()           + " ";            //Analog Current Value
-  feeder  +=  getVoltageValue()           + " ";            //Analog Voltage Value
+  String feeder =   String(module.getStatus())  + " " +
+                    TemperatureValue()          + " " +
+                    CurrentValue()              + " " +
+                    VoltageValue()              + " ";
 
   Serial.println("OK: PERIPHERAL_GET "+ feeder +";" );
 }//end PeripheralGet()
 
-String getCurrentValue()
+String TemperatureValue()
 {
-  analogReference(DEFAULT);                 //Configures the reference voltage used for analog input, Arduino Uno 5V
-  return String ( analogRead(ARDUINO_ANALOG_CURRENT) );
-}//end getCurrentValue()
-
-String getVoltageValue()
-{
-  analogReference(DEFAULT);                 //Configures the reference voltage used for analog input, Arduino Uno 5V
-  return String( smoothCalculation() );
-}//end getVoltageValue()
-
-String getTemperatureValue()
-{
-  analogReference( DEFAULT );
   return String( analogRead(ARDUINO_ANALOG_TEMPERATURE) );
-}//end getTemperatureValue()
+}
 
-// 50ms'de bir voltaj ölçümü yapar ve 8 tane ölçüm yaptıktan sonra bunların ortalamasını alır ve geri döndürür.
-float smoothCalculation()
+String CurrentValue()
+{
+  return String ( analogRead(ARDUINO_ANALOG_CURRENT) );
+}
+
+String VoltageValue()
+{
+  return String( SmoothVoltageCalculation() );
+}
+
+
+
+//  Reads eight times the voltage value from Arduino Analog Pin 4 in every 50 ms and then returns the average of total measurement.
+float SmoothVoltageCalculation()
 {
   float total = 0;
 
@@ -239,7 +208,7 @@ float smoothCalculation()
   }
 
   return total / 8;
-}//end smoothCalculation()
+}//end SmoothVoltageCalculation()
 
 
 
@@ -249,8 +218,9 @@ float smoothCalculation()
 /***************                RealTimeClock                ***************/
 void SetDefaultValuesOfRTC()
 {
+  //  void DS3232RTC::setAlarm(ALARM_TYPES_t alarmType, byte minutes, byte hours, byte daydate)
   RTC.setAlarm(ALM1_MATCH_DAY, 0, 0, 0, 1);
-  RTC.setAlarm(ALM2_MATCH_DAY, 0, 0, 0, 1);           //  void DS3232RTC::setAlarm(ALARM_TYPES_t alarmType, byte minutes, byte hours, byte daydate)
+  RTC.setAlarm(ALM2_MATCH_DAY, 0, 0, 0, 1);
   RTC.alarm(ALARM_1);
   RTC.alarm(ALARM_2);
   RTC.alarmInterrupt(ALARM_1, false);
@@ -260,13 +230,13 @@ void SetDefaultValuesOfRTC()
 
 void SetAlarm2Register (uint8_t minute, uint8_t hour, uint8_t daydate)
 {
-  RTC.setAlarm(ALM2_MATCH_DAY, minute, hour , daydate);  //  causes an alarm when the day of the week and hours and minutes match.
-  RTC.alarm(ALARM_2);                                 //  Alarm2 flagi temizlendi.
-  RTC.alarmInterrupt(ALARM_2, true);                  //  Interrupt üretecek.
+  RTC.setAlarm(ALM2_MATCH_DAY, minute, hour , daydate);   //  Causes an alarm when the day of the week and hours and minutes match.
+  RTC.alarm(ALARM_2);                                     //  Clears the ALARM_2 flag. ( ALARM_2 flag is set when RTC produces an interrupt. )
+  RTC.alarmInterrupt(ALARM_2, true);                      //  When the day of the week and hours and minutes match, RTC will produce an interrupt.
 }
 
-//  DateTime  =   "2018 01 01 00 00 00"
-time_t getDateTimeAsSeconds(String& DateTime)
+//  Format of DateTime  =   "2018 01 01 00 00 00"
+time_t DateTimeAsSeconds(String& DateTime)
 {
   String delimiter = " ";   //  Space is the indicator between parameters.
 
@@ -292,13 +262,13 @@ time_t getDateTimeAsSeconds(String& DateTime)
   return makeTime( rtcTime );
 }
 
-void ClockSet( String& DateTime )
+void ClockSet( String DateTime )
 {
-  bool isSet = RTC.set( getDateTimeAsSeconds( DateTime ) );
-  if( isSet == 0 )
-    Serial.println("OK: CLOCK_SET ;");
-  else
-    Serial.println("ERROR: CLOCK_SET ;");
+  bool isSet = RTC.set( DateTimeAsSeconds( DateTime ) );
+
+  if( isSet == 0 )      Serial.println("OK: CLOCK_SET ;");
+  else                  Serial.println("ERROR: CLOCK_SET ;");
+
 }
 
 void ClockGet()
@@ -341,16 +311,16 @@ String DayDate( int timelibFormatDay )
 
 
 /***************                Alarm                ***************/
-void AlarmSet( String& alarmDescription )
+void AlarmSet( String alarmDescription )
 {
-  AlarmTask newAlarm ( alarmDescription );        //  Yeni alarm oluşturulacak.
+  AlarmTask newAlarm ( alarmDescription );
 
   if( alarmList.push_sorted( newAlarm ) )   Serial.println("OK: ALARM_SET ;" );
   else                                      Serial.println("ERROR: ALARM_SET ;" );
 
   if ( alarmList.size() == 1 )
   {
-    currentAlarmIterator = alarmList.begin();     //  Şu anki alarm olarak listenin başı tutuluyor.
+    currentAlarmIterator = alarmList.begin();
     UpdateAlarm2RegisterOfRTC();
   }
 }
