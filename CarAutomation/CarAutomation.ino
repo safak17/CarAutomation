@@ -8,7 +8,7 @@
 
 #define ARDUINO_ANALOG_CURRENT              3                       //  Akım değeri,      Arduino'nun Analog 3 pininden gelecek.
 #define ARDUINO_ANALOG_VOLTAGE              4                       //  Voltaj değeri,    Arduino'nun Analog 4 pininden gelecek.
-#define ARDUINO_ANALOG_TEMPERATURE          5                       //  Sıcaklık değeri,  Arduino'nun Analog 5 pininden gelecek.
+#define ARDUINO_ANALOG_TEMPERATURE          2                       //  Sıcaklık değeri,  Arduino'nun Analog 2 pininden gelecek.
 
 #define SMOOTH_CALCULATION_FREQUENCY_NUMBER 8                       //  SmoothCalculation fonksiyonunda 8 tane ölçüm yapılıyor.
 
@@ -47,11 +47,14 @@ void loop()
       RelayOperate( triggeredAlarm.relayNumber(), triggeredAlarm.relayStatus() );   //  Gerekli röle işlemlerini yap.
       Serial.println("OK: ALARM_TRIGGERED " + String(triggeredAlarm.id()) + " ;");
 
-      if ( ! triggeredAlarm.isRepeat() )  alarmList.remove( currentAlarmIterator.current().info() );    //  Tekrar etmeyen alarm ise, listeden çıkar.
+      if ( ! triggeredAlarm.isRepeat() )
+        alarmList.remove( currentAlarmIterator.current().info() );    //  Tekrar etmeyen alarm ise, listeden çıkar.
 
-      currentAlarmIterator++;
 
-    } while ( triggeredAlarm.isSameTime( currentAlarmIterator.current().info() ));
+      (alarmList.size() == 0) ? currentAlarmIterator = NULL : currentAlarmIterator++;
+
+    } while ( (alarmList.size() != 0) &&
+              (triggeredAlarm.isSameTime( currentAlarmIterator.current().info() )));
 
 
     UpdateAlarm2RegisterOfRTC();                                                        //  ... ve alarm registerini güncelle.
@@ -220,7 +223,7 @@ String getVoltageValue()
 
 String getTemperatureValue()
 {
-  analogReference( INTERNAL );
+  analogReference( DEFAULT );
   return String( analogRead(ARDUINO_ANALOG_TEMPERATURE) );
 }//end getTemperatureValue()
 
@@ -408,3 +411,7 @@ uint16_t castDayToTimelibFormat( uint16_t day )
 {
     return ( day == 7 ) ? 1 : day + 1;
 }
+
+
+//  cs 2018 8 27 16 29 0 ;
+//  as 0 0 1 16 30 1 1 ;
