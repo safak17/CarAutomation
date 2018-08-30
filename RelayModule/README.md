@@ -1,7 +1,18 @@
+# Table of contents
+0. [What is RelayModule Library? If I use it, how easier life will be ?](#title0)
+1. [Adding RelayModule Library to the Arduino Libraries Folder](#title1)
+2. [Importing RelayModule Library to the Arduino Project Source Code](#title2)
+3. [How to use RelayModule Library ?](#title3)
+      1. [Creating RelayModule Instance](#title3sub1)
+      2. [Setting Pins and Modes of Relays](#title3sub2)
+      3. [All Functions of RelayModule](#title3sub3)
+4. [Talk Is Cheap, Show Me The Code](#title4)
+
 # RelayModule Library for Arduino
 ![RelayModule](Photos/RelayModule.gif)<br><br><br>
 
-## O. What is RelayModule Library? If I use it, how easier life will be ?
+<a name="title0"></a>
+## O. What is RelayModule Library? If I use it, how easier life will be ? 
 If you have made some Arduino project with Relay Modules, you probably wrote some **scattered code** for relays.<br>
 
 **Scattered Code Example 1:** You should initalize all the pins and modes for each relay.<br>
@@ -36,6 +47,7 @@ You can create RelayModule instance in your Arduino source code, and **initalize
 Without thinking about "**Should I write LOW or HIGH to activate it?**", you will make relays activate or deactivate easily.<br>
 <br>
 <br>
+<a name="title1"></a>
 ## 1. Adding RelayModule Library to the Arduino Libraries Folder
 After downloading RelayModule folder, you should place it to the **libraries** folder which should be located in the Arduino folder.
 <br>
@@ -44,6 +56,7 @@ For me, this libraries folder is located in: <br>
 **/Users/safakakinci/Documents/Arduino/libraries/RelayModule** <br>
 ![Adding_RelayModule_Library](Photos/Adding_RelayModule_Library_To_The_Arduino_Libraries_Folder.png)<br><br><br>
 <br><br><br>
+<a name="title2"></a>
 ## 2. Importing RelayModule Library to the Arduino Project Source Code
 On the menu bar, you are going to see **Include Library** which is located under the **Sketch** tab.<br>
 Click **RelayModule** which is at the bottom of **Include Library** pane.<br>
@@ -54,12 +67,15 @@ Click **RelayModule** which is at the bottom of **Include Library** pane.<br>
 After clicking it, those two lines below automatically will be added to the source code.<br>
 ![Importing_RelayModule_Library](Photos/Importing_RelayModule_Library_To_The_Arduino_Source_Code_2.png)<br><br><br>
 
+<a name="title3"></a>
 ## 3. How to use RelayModule Library ?
+<a name="title3sub1"></a>
 ### 3.1 Creating RelayModule Instance
 `RelayModule module(4, LOW);`<br>
 We have specified that there are **4 relays** on this Relay Module and it is working with **LOW** logic.<br>
 Working with **LOW logic** specifies that **relays will be activated** when `digitalWrite(pin, LOW)` is executed.<br>
 <br>
+<a name="title3sub2"></a>
 ### 3.2 Setting Pins and Modes of Relays
 **module** which we have created above(3.1) has 4 relays. We should set pin number and pin mode for each relay.<br>
 As an example, look at the figure below! **Arduino Uno and 4 Relay Module are connected.**<br>
@@ -76,46 +92,22 @@ If we have those connections, we need to set the Relay Module's pins as:<br>
 **setPinNumber(5)** specifies that relay is connected with Arduino's **Digital5** pin.<br>
 **setPinMode(OUTPUT)** specifies that Arduino's **Digital5** pin will be used on **OUTPUT** mode.<br>
 <br>
-
+<a name="title3sub3"></a>
 ### 3.3 All Functions of RelayModule
 
-<table>
-    <tr>
-        <th width=30%><b>Functions</b></th>
-        <th width=40%><b>Explanation</b></th>
-        <th><b>Example</b></th>
-    </tr>
-    <tr>
-        <td> module( channelNumber, logic ); </td>
-        <td> Initiates the relay module. </td>
-        <td> module( 4 , LOW );<br> It is 4 channel relay module which is working with LOW logic. </td>
-    </tr>
-    <tr>
-        <td> module.active( relayNumber ); </td>
-        <td> Activates the relay.</td>
-        <td> module.active(3);<br>Activates the third relay. </td>
-    </tr>
-    <tr>
-        <td> module.activeAll(); </td>
-        <td> Activates all relays on the Relay Module.</td>
-    </tr>
-    <tr>
-        <td> module.deactive( relayNumber ); </td>
-        <td> Deactivates the relay.</td>
-        <td> module.deactive(1);<br>Deactivates the first relay. </td>
-    </tr>
-    <tr>
-        <td> module.deactiveAll(); </td>
-        <td> Deactivates all relays on the Relay Module. </td>
-    </tr>
-    <tr>
-        <td> module.getStatus(); </td>
-        <td> Returns the status of relays as integer. </td>
-        <td> Status: 7 <br> 7 = 0 + 4 + 2 + 1 <br> Specifies that Relay 1,2, 3 are active and Relay4 is deactive. </td>
-    </tr>
-    
-</table>
+| Functions  &nbsp; &nbsp; &nbsp;  | Example  &nbsp; &nbsp; &nbsp; &nbsp; |  Explanation  |
+|--------------------------------------- | :---------------------: | :-----------:    |
+| ` module(channelNumber, logic);`          |    RelayModule module( 4, LOW );  |     It is **4 channel relay module** which is working with **LOW logic**. |  
+| ` module.activate(relayNumber);`          |    module.activate( 1 ) ;                             |     Activates the **first relay (IN1)**.  | 
+| ` module.activateAll();`                               |    module.activateAll();                         |     Activates all relays on the Relay Module.  |
+| ` module.deactivate(relayNumber);`      |    module.deactivate( 4 ) ;                         |     Deactivates the **fourth relay. (IN4)**  |
+| ` module.deactivateAll();`                           |    module.deactivateAll( ) ;                   |     Deactivates all relays on the Relay Module. |
+|` module.getStatus();`                                    |    module.getStatus( ) ;                        |     Status: 7 <br> 7 = 0 + 4 + 2 + 1 <br> Specifies that Relay **1,2, 3 are active** and Relay4 is deactive.  |
+|` module[relayNumber].getStatus();`     |    module[3].getStatus( ) ;                       |     Returns the status of **third relay (IN3)** as integer.  |
 
-## 4 Talk Is Cheap, Show Me The Code
-![RelayModuleExample](Photos/Talk_Is_Cheap_Show_Me_The_Code.png)<br><br><br>
+
+<a name="title4"></a>
+## 4. Talk Is Cheap, Show Me The Code
+![RelayModuleExample](Photos/Talk_Is_Cheap_Show_Me_The_Code.png)
+<br><br><br>
 

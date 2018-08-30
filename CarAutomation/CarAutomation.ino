@@ -8,7 +8,7 @@ SoftwareSerial BluetoothSerial(0, 1);                               //  Arduino'
 
 #include </Users/safakakinci/Documents/Arduino/libraries/CircularList/CircularList.cpp>
 CircularList<AlarmTask> alarmList;                                  //  Alarms will be added to the alarmList.
-CircularList<AlarmTask>::iterator currentAlarmIterator;             //  To hold the current alarm in the alarmList.
+CircularList<AlarmTask>::iterator currentAlarmIterator = NULL;      //  To hold the current alarm ( the one that will be triggered ) in the alarmList.
 
 #include <RelayModule.h>                                            //  To control relay module "easily".
 RelayModule module(4, LOW);                                         //  It is a 4 channel relay module and it is working with ACTIVE LOW logic.
@@ -39,27 +39,26 @@ void setup()
 
 void loop()
 {
-  if ( RTC.alarm( ALARM_2 ) )
+  if ( RTC.alarm( ALARM_2 ) ) //  If Real Time Clock produces an interrupt because of ALARM_2 register.
   {
     AlarmTask& triggeredAlarm = currentAlarmIterator.current().info();
 
     do
     {
-      AlarmTask& triggeredAlarm  =   currentAlarmIterator.current().info();         //  Tetiklenen alarmın bilgilerini al.  (Referans olarak, kopyalamaya gerek yok.)
-      RelayOperate( triggeredAlarm.relayNumber(), triggeredAlarm.relayStatus() );   //  Gerekli röle işlemlerini yap.
+      AlarmTask& triggeredAlarm = currentAlarmIterator.current().info();
       Serial.println("OK: ALARM_TRIGGERED " + String(triggeredAlarm.id()) + " ;");
+      RelayOperate( triggeredAlarm.relayNumber(), triggeredAlarm.relayStatus() );
 
       if ( ! triggeredAlarm.isRepeat() )
-        alarmList.remove( currentAlarmIterator.current().info() );    //  Tekrar etmeyen alarm ise, listeden çıkar.
-
+        alarmList.remove( currentAlarmIterator.current().info() );
 
       (alarmList.size() == 0) ? currentAlarmIterator = NULL : currentAlarmIterator++;
 
-    } while ( (alarmList.size() != 0) &&
+    } while ( (currentAlarmIterator != NULL) &&
               (triggeredAlarm.isSameTime( currentAlarmIterator.current().info() )));
 
 
-    UpdateAlarm2RegisterOfRTC();                                                        //  ... ve alarm registerini güncelle.
+    UpdateAlarm2RegisterOfRTC();
     SleepNow();
   }// if ( RTC.alarm( ALARM_2 ) )
 }// loop()
@@ -94,6 +93,9 @@ void serialEvent()                                        //  Called when data i
 
     else if ( receivedBluetoothData.startsWith("al"))
       AlarmList();
+
+    else
+      Serial.println("ERROR: BAD_FOMRAT ;");
 
     receivedBluetoothData = receivedBluetoothData.substring( receivedBluetoothData.indexOf(";") + 1);
   }//end while ( receivedBluetoothData.endsWith(" ;") )
@@ -141,20 +143,20 @@ void SetRelayModule()
   module[2].setPinNumber(6).setPinMode(OUTPUT);       //  Relay2 (IN2) is connected to the Arduino's digital pin 6.
   module[3].setPinNumber(5).setPinMode(OUTPUT);       //  Relay3 (IN3) is connected to the Arduino's digital pin 5.
   module[4].setPinNumber(4).setPinMode(OUTPUT);       //  Relay4 (IN4) is connected to the Arduino's digital pin 4.
-  module.deactiveAll();                               //  At the beginning, deactivates all the relays.
+  module.deactivateAll();                             //  At the beginning, deactivates all the relays.
 }
 
 void RelayOperate( uint8_t relayNumber, uint8_t relayStatus )
 {
   if ( relayStatus )
   {
-    if ( module.active( relayNumber ) )   {   Serial.println("OK: RELAY_OPERATE " + String(relayNumber) + " ;");      }
-    else                                  {   Serial.println("ERROR: RELAY_OPERATE " + String(relayNumber) + " ;");   }
+    if ( module.activate( relayNumber ) )   {   Serial.println("OK: RELAY_OPERATE " + String(relayNumber) + " ;");      }
+    else                                    {   Serial.println("ERROR: RELAY_OPERATE " + String(relayNumber) + " ;");   }
   }
   else
   {
-    if ( module.deactive( relayNumber ) ) {   Serial.println("OK: RELAY_OPERATE " + String(relayNumber) + " ;");      }
-    else                                  {   Serial.println("ERROR: RELAY_OPERATE " + String(relayNumber) + " ;");   }
+    if ( module.deactivate( relayNumber ) ) {   Serial.println("OK: RELAY_OPERATE " + String(relayNumber) + " ;");      }
+    else                                    {   Serial.println("ERROR: RELAY_OPERATE " + String(relayNumber) + " ;");   }
   }
 
 }//end RelayOperate()
@@ -174,9 +176,9 @@ void PeripheralGet()
   String feeder =   String(module.getStatus())  + " " +
                     TemperatureValue()          + " " +
                     CurrentValue()              + " " +
-                    VoltageValue()              + " ";
+                    VoltageValue()              ;
 
-  Serial.println("OK: PERIPHERAL_GET "+ feeder +";" );
+  Serial.println("OK: PERIPHERAL_GET "+ feeder +" ;" );
 }//end PeripheralGet()
 
 String TemperatureValue()
@@ -354,7 +356,10 @@ void UpdateAlarm2RegisterOfRTC()
     SetAlarm2Register( firstAlarm.minute(),  firstAlarm.hour(), castDayToTimelibFormat(firstAlarm.day()) );
   }
   else
+  {
+    currentAlarmIterator = NULL;
     SetDefaultValuesOfRTC();
+  }
 }
 
 /*
