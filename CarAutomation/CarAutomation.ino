@@ -6,9 +6,9 @@
 #include <SoftwareSerial.h>                                         //  https://www.arduino.cc/en/Reference/SoftwareSerial
 SoftwareSerial BluetoothSerial(0, 1);                               //  Arduino's ( RX | 0 ) &&  ( TX | 1 )
 
-#include </Users/safakakinci/Documents/Arduino/libraries/CircularList/CircularList.cpp>
-CircularList<AlarmTask> alarmList;                                  //  Alarms will be added to the alarmList.
-CircularList<AlarmTask>::iterator currentAlarmIterator = NULL;      //  To hold the current alarm ( the one that will be triggered ) in the alarmList.
+#include </Users/safakakinci/Documents/Arduino/libraries/SLL/SinglyLinkedList.cpp>
+SinglyLinkedList<AlarmTask> alarmList;                              //  Alarms will be added to the alarmList.
+SinglyLinkedList<AlarmTask>::iterator currentAlarmIterator = NULL;  //  To hold the current alarm ( the one that will be triggered ) in the alarmList.
 
 #include <RelayModule.h>                                            //  To control relay module "easily".
 RelayModule module(4, LOW);                                         //  It is a 4 channel relay module and it is working with ACTIVE LOW logic.
@@ -49,13 +49,14 @@ void loop()
       Serial.println("OK: ALARM_TRIGGERED " + String(triggeredAlarm.id()) + " ;");
       RelayOperate( triggeredAlarm.relayNumber(), triggeredAlarm.relayStatus() );
 
-      if ( ! triggeredAlarm.isRepeat() )
+      if ( ! triggeredAlarm.isRepeat() )  {
         alarmList.remove( currentAlarmIterator.current().info() );
+        currentAlarmIterator = alarmList.begin();
+      }else {
+        currentAlarmIterator++;
+      }
 
-      (alarmList.size() == 0) ? currentAlarmIterator = NULL : currentAlarmIterator++;
-
-    } while ( (currentAlarmIterator != NULL) &&
-              (triggeredAlarm.isSameTime( currentAlarmIterator.current().info() )));
+    } while ( currentAlarmIterator != NULL && triggeredAlarm.isSameTime( currentAlarmIterator.current().info() ));
 
 
     UpdateAlarm2RegisterOfRTC();
@@ -150,12 +151,12 @@ void RelayOperate( uint8_t relayNumber, uint8_t relayStatus )
 {
   if ( relayStatus )
   {
-    if ( module.activate( relayNumber ) )   {   Serial.println("OK: RELAY_OPERATE " + String(relayNumber) + " ;");      }
+    if ( module.activate( relayNumber ) )   {   Serial.println("OK: RELAY_OPERATE " + String(relayNumber) + " ACTIVE ;");      }
     else                                    {   Serial.println("ERROR: RELAY_OPERATE " + String(relayNumber) + " ;");   }
   }
   else
   {
-    if ( module.deactivate( relayNumber ) ) {   Serial.println("OK: RELAY_OPERATE " + String(relayNumber) + " ;");      }
+    if ( module.deactivate( relayNumber ) ) {   Serial.println("OK: RELAY_OPERATE " + String(relayNumber) + " DEACTIVE ;");      }
     else                                    {   Serial.println("ERROR: RELAY_OPERATE " + String(relayNumber) + " ;");   }
   }
 
@@ -235,6 +236,7 @@ void SetAlarm2Register (uint8_t minute, uint8_t hour, uint8_t daydate)
   RTC.setAlarm(ALM2_MATCH_DAY, minute, hour , daydate);   //  Causes an alarm when the day of the week and hours and minutes match.
   RTC.alarm(ALARM_2);                                     //  Clears the ALARM_2 flag. ( ALARM_2 flag is set when RTC produces an interrupt. )
   RTC.alarmInterrupt(ALARM_2, true);                      //  When the day of the week and hours and minutes match, RTC will produce an interrupt.
+  Serial.println("OK: ALARM_SET ;" );
 }
 
 //  Format of DateTime  =   "2018 01 01 00 00 00"
@@ -271,6 +273,7 @@ void ClockSet( String DateTime )
   if( isSet == 0 )      Serial.println("OK: CLOCK_SET ;");
   else                  Serial.println("ERROR: CLOCK_SET ;");
 
+  UpdateAlarm2RegisterOfRTC();
 }
 
 void ClockGet()
@@ -316,15 +319,9 @@ String DayDate( int timelibFormatDay )
 void AlarmSet( String alarmDescription )
 {
   AlarmTask newAlarm ( alarmDescription );
+  alarmList.push_sorted( newAlarm );
 
-  if( alarmList.push_sorted( newAlarm ) )   Serial.println("OK: ALARM_SET ;" );
-  else                                      Serial.println("ERROR: ALARM_SET ;" );
-
-  if ( alarmList.size() == 1 )
-  {
-    currentAlarmIterator = alarmList.begin();
-    UpdateAlarm2RegisterOfRTC();
-  }
+  UpdateAlarm2RegisterOfRTC();
 }
 
 void AlarmDisarm( uint8_t alarmId )
@@ -340,7 +337,7 @@ void AlarmList()
 {
   Serial.println("OK: ALARM_LIST_SIZE " + String( alarmList.size()) + " ;");
 
-  CircularList<AlarmTask>::iterator it;
+  SinglyLinkedList<AlarmTask>::iterator it;
   for ( it = alarmList.begin();  it.position() < alarmList.size(); it++  )
     Serial.println("OK: ALARM_LIST_ITEM " + it.current().info().getDescription() );
 
@@ -350,15 +347,14 @@ void alarmFunction() {}
 
 void UpdateAlarm2RegisterOfRTC()
 {
-  if ( alarmList.size() != 0 )
-  {
-    AlarmTask& firstAlarm = currentAlarmIterator.current().info();
-    SetAlarm2Register( firstAlarm.minute(),  firstAlarm.hour(), castDayToTimelibFormat(firstAlarm.day()) );
-  }
-  else
-  {
+  if( alarmList.size() == 0 ){
     currentAlarmIterator = NULL;
     SetDefaultValuesOfRTC();
+  }
+  else{
+    currentAlarmIterator = alarmList.begin();
+    AlarmTask& firstAlarm = currentAlarmIterator.current().info();
+    SetAlarm2Register( firstAlarm.minute(),  firstAlarm.hour(), castDayToTimelibFormat(firstAlarm.day()) );
   }
 }
 
@@ -388,5 +384,6 @@ uint16_t castDayToTimelibFormat( uint16_t day )
 }
 
 
-//  cs 2018 8 27 16 29 0 ;
-//  as 0 0 1 16 30 1 1 ;
+//  cs 2018 9 3 12 29 0 ;
+//  as 0 0 1 12 30 1 1 ;
+
