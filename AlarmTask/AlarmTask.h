@@ -1,116 +1,165 @@
 #ifndef ALARMTASK_H
 #define ALARMTASK_H
 
-#define REPEAT_MASK 0x8000
-#define DAY_OF_WEEK_MASK 0x7000
-#define HOUR_MASK 0x0F80
-#define MINUTE_MASK 0x0070
-#define RELAY_NUMBER_MASK 0x000E
-#define STATUS_MASK 0x0001
+/*                MASKS                 */
+#define MASK_ALARM_ID           0xFE000000
+#define MASK_ENABLE             0x01000000
 
-#define DIGIT_VALUE_REPEAT 32768            //  2^15
-#define DIGIT_VALUE_DAY_OF_WEEK 4096        //  2^12
-#define DIGIT_VALUE_HOUR 128                //  2^7
-#define DIGIT_VALUE_MINUTE 16               //  2^4
-#define DIGIT_VALUE_RELAY_NUMBER 2          //  2^1
+#define MASK_RELAY_4            0x00C00000
+#define MASK_RELAY_3            0x00300000
+#define MASK_RELAY_2            0x000C0000
+#define MASK_RELAY_1            0x00030000
+
+#define MASK_REPEAT             0x0000C000
+#define MASK_MINUTE             0x00003F00
+#define MASK_HOUR               0x000000F8
+#define MASK_DAY_OF_WEEK        0x00000007
+
+
+/*              DIGIT_VALUE           */
+#define DIGIT_VALUE_ID          0x02000000
+#define DIGIT_VALUE_ENABLE      0x01000000
+
+#define DIGIT_VALUE_RELAY_4     0x00400000
+#define DIGIT_VALUE_RELAY_3     0x00100000
+#define DIGIT_VALUE_RELAY_2     0x00040000
+#define DIGIT_VALUE_RELAY_1     0x00010000
+
+#define DIGIT_VALUE_REPEAT      0x00004000
+#define DIGIT_VALUE_MINUTE      0x00000100
+#define DIGIT_VALUE_HOUR        0x00000008
+#define DIGIT_VALUE_DAY_OF_WEEK 0x00000001
+
+//  typedef enum { NO_REPEAT, EVERY_DAY, EVERY_WEEK, INVALID } enumRepeat_t;
+//  typedef enum { DONT_CARE, ON, OFF, TOGGLE } enumRelayStatus_t;
 
 class AlarmTask{
 private:
     
-    uint16_t    alarmId;
-    uint16_t    alarmTask;
-    
+    uint32_t alarm;
+    uint32_t onesComplement(uint32_t number){ return (0xFFFFFFFF - number) ;}
 public:
-    AlarmTask( uint16_t alarmId ):alarmTask(0), alarmId(alarmId){};
     
-    //  Space is the indicator.
-    //  String alarmDescription = "id repeat dayOfWeek hour minute relayNumber relayStatus";
-    //  String alarmDescription = "1 1 1 23 50 7 1"
-    //  alarmId     =   1
-    //  repeat      =   1       ( repeats )
-    //  dayOfWeek   =   1       ( Monday )
-    //  hour        =   23
-    //  minute      =   50      ( The user can ONLY set the alarm the multiplies of 10. )
-    //  relayNumber =   7       ( 7th relay )
-    //  relayStatus =   1       ( will be activated )
-    AlarmTask (String alarmDescription):alarmTask(0)
-    {
-        String delimiter = " ";
-        uint16_t parameters[7];
-        
-        size_t start = 0;
-        size_t end = alarmDescription.indexOf(delimiter);
-        for(int i=0; i<7; i++)
-        {
-            parameters[i] = (alarmDescription.substring(start, end)).toInt();
-            
-            start = end + 1;
-            end = alarmDescription.indexOf(delimiter, start);
-        }
-        
-        alarmId    = parameters[0];                                   //  alarmId
-        alarmTask += parameters[1] * DIGIT_VALUE_REPEAT;              //  repeat
-        alarmTask += parameters[2] * DIGIT_VALUE_DAY_OF_WEEK;         //  dayOfWeek
-        alarmTask += parameters[3] * DIGIT_VALUE_HOUR;                //  hour
-        alarmTask += parameters[4] / 10 * DIGIT_VALUE_MINUTE;         //  minute: User can only set the alarm multiplies of ten.
-        alarmTask +=(parameters[5] - 1) * DIGIT_VALUE_RELAY_NUMBER;   //  relayNumber: Relay numbers can be from 1 to 8, but we can store from 0 to 7 in 3 bits.
-        alarmTask += parameters[6];                                   //  relayStatus
+    
+    
+    AlarmTask (uint32_t alarmDescription ):alarm(alarmDescription){}
+    uint32_t getAlarm()      const   {  return alarm; }
+    uint16_t id()            const   {  return ( alarm & MASK_ALARM_ID  ) / DIGIT_VALUE_ID ; }
+    uint16_t isEnable()      const   {  return ( alarm & MASK_ENABLE    ) / DIGIT_VALUE_ENABLE ; }
+    
+    uint16_t relay4()        const   {  return ( alarm & MASK_RELAY_4   ) / DIGIT_VALUE_RELAY_4 ; }
+    uint16_t relay3()        const   {  return ( alarm & MASK_RELAY_3   ) / DIGIT_VALUE_RELAY_3 ; }
+    uint16_t relay2()        const   {  return ( alarm & MASK_RELAY_2   ) / DIGIT_VALUE_RELAY_2 ; }
+    uint16_t relay1()        const   {  return ( alarm & MASK_RELAY_1   ) / DIGIT_VALUE_RELAY_1 ; }
+    
+    uint16_t repeat()        const   {  return ( alarm & MASK_REPEAT    ) / DIGIT_VALUE_REPEAT ; }
+    uint16_t minute()        const   {  return ( alarm & MASK_MINUTE    ) / DIGIT_VALUE_MINUTE ; }
+    uint16_t hour()          const   {  return ( alarm & MASK_HOUR      ) / DIGIT_VALUE_HOUR ; }
+    uint16_t dayWeek()     const   {  return ( alarm & MASK_DAY_OF_WEEK)/ DIGIT_VALUE_DAY_OF_WEEK ; }
+    
+    
+    void setAlarm(uint32_t alarm){
+        this->alarm = alarm;
     }
     
-    void     setId( uint16_t id )    {  alarmId = id;                                                                 }
-    uint16_t id()            const   {   return ( alarmId );                                                          }
+    void setId( uint16_t id ) {
+        alarm &= onesComplement( MASK_ALARM_ID );       //  Previous id is cleared.
+        alarm += id * DIGIT_VALUE_ID;                   //  The new one is set.
+    }
+    void setEnable( uint16_t enable ) {
+        alarm &= onesComplement( MASK_ENABLE );
+        alarm += enable * DIGIT_VALUE_ENABLE;
+    }
     
-    uint16_t isRepeat()      const   {   return ( alarmTask & REPEAT_MASK )         / DIGIT_VALUE_REPEAT;             }
-    uint16_t day()           const   {   return ( alarmTask & DAY_OF_WEEK_MASK )    / DIGIT_VALUE_DAY_OF_WEEK;        }
-    uint16_t hour()          const   {   return ( alarmTask & HOUR_MASK )           / DIGIT_VALUE_HOUR;               }
-    uint16_t minute()        const   {   return ( alarmTask & MINUTE_MASK )         / DIGIT_VALUE_MINUTE * 10;        }
-    uint16_t relayNumber()   const   {   return ((alarmTask & RELAY_NUMBER_MASK)    / DIGIT_VALUE_RELAY_NUMBER) + 1;  }
-    uint16_t relayStatus()   const   {   return ( alarmTask & STATUS_MASK );                                          }
     
+    
+    
+    void setRelay4(uint16_t relay4) {
+        alarm &= onesComplement( MASK_RELAY_4 );
+        alarm += relay4 * DIGIT_VALUE_RELAY_4;
+    }
+    void setRelay3(uint16_t relay3) {
+        alarm &= onesComplement( MASK_RELAY_3 );
+        alarm += relay3 * DIGIT_VALUE_RELAY_3;
+    }
+    void setRelay2(uint16_t relay2) {
+        alarm &= onesComplement( MASK_RELAY_2 );
+        alarm += relay2 * DIGIT_VALUE_RELAY_2;
+    }
+    void setRelay1(uint16_t relay1) {
+        alarm &= onesComplement( MASK_RELAY_1 );
+        alarm += relay1 * DIGIT_VALUE_RELAY_1;
+    }
+    
+    
+    
+    void setRepeat(uint16_t repeat){
+        alarm &= onesComplement( MASK_REPEAT );
+        alarm += repeat * DIGIT_VALUE_REPEAT;
+    }
+    void setMinute(uint16_t minute){
+        alarm &= onesComplement( MASK_MINUTE );
+        alarm += minute * DIGIT_VALUE_MINUTE;
+    }
+    void setHour(uint16_t hour){
+        alarm &= onesComplement( MASK_HOUR );
+        alarm += hour * DIGIT_VALUE_HOUR;
+    }
+    void setDayOfWeek(uint16_t dayWeek){
+        alarm &= onesComplement( MASK_DAY_OF_WEEK );
+        alarm += dayWeek * DIGIT_VALUE_DAY_OF_WEEK;
+    }
+    
+    
+    bool operator< (const AlarmTask& rhs) const {
+        int rhsDayTime = rhs.dayWeek() * 4 + rhs.hour() * 2 + rhs.minute();
+        int lhsDayTime = dayWeek() * 4 + hour() * 2 + minute();
+        return ( lhsDayTime < rhsDayTime );
+    }
+    
+    bool operator<= (const AlarmTask& rhs) const {
+        int rhsDayTime = rhs.dayWeek() * 4 + rhs.hour() * 2 + rhs.minute();
+        int lhsDayTime = dayWeek() * 4 + hour() * 2 + minute();
+        return ( lhsDayTime <= rhsDayTime );
+    }
+    
+    bool operator== (const AlarmTask& rhs) const {
+        return id() == rhs.id();
+    }
+    
+    bool operator!= (const AlarmTask& rhs) const{
+        return !( *this == rhs );
+    }
+    
+    bool operator>= (const AlarmTask& rhs) const{
+        return !(*this < rhs );
+    }
+    
+    bool operator> (const AlarmTask& rhs) const{
+        return !(*this <= rhs);
+    }
+    
+    bool isSameTime(const AlarmTask& rhs) const{
+        int rhsDayTime = rhs.dayWeek() * 4 + rhs.hour() * 2 + rhs.minute();
+        int lhsDayTime = dayWeek() * 4 + hour() * 2 + minute();
+        return ( lhsDayTime == rhsDayTime );
+    }
     
     String getDescription()
     {
-        return (String( alarmId         ) + " " +
-                String( isRepeat()      ) + " " +
-                String( day()           ) + " " +
-                String( hour()          ) + " " +
-                String( minute()        ) + " " +
-                String( relayNumber()   ) + " " +
-                String( relayStatus()   ) + " ;");
+        return ("id: " +        String( id()                ) + " " +
+                "isEnable: " +  String( isEnable()          ) + " " +
+                "relay4: " +    String( relay4()            ) + " " +
+                "relay3: " +    String( relay3()            ) + " " +
+                "relay2: " +    String( relay2()            ) + " " +
+                "relay1: " +    String( relay1()            ) + " " +
+                "repeat: " +    String( repeat()            ) + " " +
+                "minute: " +    String( minute()            ) + " " +
+                "hour: " +      String( hour()              ) + " " +
+                "dayWeek: " +   String( dayWeek()           ));
     }
     
-    bool operator< (const AlarmTask& rhs) const
-    {
-        if( day() < rhs.day() )
-            return true;
-        
-        if( day() == rhs.day() && hour() < rhs.hour() )
-            return true;
-        
-        if( day() == rhs.day() && hour() == rhs.hour() && minute() < rhs.minute() )
-            return true;
-        
-        return false;
-    }
     
-    bool operator== (const AlarmTask& rhs) const
-    {
-        return ( alarmId == rhs.alarmId );
-    }
-    
-    bool operator!= (const AlarmTask& rhs) const
-    {
-        return !(  (*this) == rhs  );
-    }
-    
-    bool isSameTime(const AlarmTask& rhs) const
-    {
-        if ( &rhs == NULL) return false;
-        
-        return  (day()        ==   rhs.day()     &&
-                 hour()       ==   rhs.hour()    &&
-                 minute()     ==   rhs.minute()   )?     true    :   false;
-    }
 };
 
 #endif

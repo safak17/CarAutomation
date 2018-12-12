@@ -2,7 +2,7 @@
 //  tmElements_t  is defined in https://github.com/JChristensen/DS3232RTC
 //  time_t        is defined in http://www.cplusplus.com/reference/ctime/time_t/
 
-String DateTime = "2018 08 24 16 20 00";
+String DateTime = "2018 9 4 16 20 00";
 void setup()
 {
   Serial.begin(9600);
@@ -22,7 +22,7 @@ String displayRTCTime()
 
   return (  "Year: "    + String(rtcTime.Year + 1970) + "\n"  //  Here rtcTime.Year will return 48. Because, time is offset from 1970.
             "Month: "   + String(rtcTime.Month) + "\n"
-            "Day: "     + String(rtcTime.Day) + "(" + String(rtcTime.Wday) + ")\n"
+            "Day: "     + String(rtcTime.Day) + "(" + String(rtcTime.Wday) + ")\n"    //  rtcTime.Wday = Day of the week (1-7), Sunday is day 1
             "Hour: "    + String(rtcTime.Hour) + "\n"
             "Minute: "  + String(rtcTime.Minute) + "\n"
             "Second: "  + String(rtcTime.Second) + "\n" );

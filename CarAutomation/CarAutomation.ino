@@ -6,14 +6,12 @@
 #include <SoftwareSerial.h>                                         //  https://www.arduino.cc/en/Reference/SoftwareSerial
 SoftwareSerial BluetoothSerial(0, 1);                               //  Arduino's ( RX | 0 ) &&  ( TX | 1 )
 
-#include </Users/safakakinci/Documents/Arduino/libraries/SLL/SinglyLinkedList.cpp>
+#include </Users/safakakinci/Documents/Arduino/libraries/SinglyLinkedList/SinglyLinkedList.cpp>
 SinglyLinkedList<AlarmTask> alarmList;                              //  Alarms will be added to the alarmList.
 SinglyLinkedList<AlarmTask>::iterator currentAlarmIterator = NULL;  //  To hold the current alarm ( the one that will be triggered ) in the alarmList.
 
 #include <RelayModule.h>                                            //  To control relay module "easily".
 RelayModule module(4, LOW);                                         //  It is a 4 channel relay module and it is working with ACTIVE LOW logic.
-
-
 
 #define ARDUINO_ANALOG_TEMPERATURE          2                       //  Temperature value will be read from Arduino's Analog Pin 2.
 #define ARDUINO_ANALOG_CURRENT              3                       //  Current value     will be read from Arduino's Analog Pin 3.
@@ -37,27 +35,26 @@ void setup()
   SleepNow();
 }
 
+AlarmTask triggeredAlarm(1);
 void loop()
 {
   if ( RTC.alarm( ALARM_2 ) ) //  If Real Time Clock produces an interrupt because of ALARM_2 register.
   {
-    AlarmTask& triggeredAlarm = currentAlarmIterator.current().info();
-
     do
     {
-      AlarmTask& triggeredAlarm = currentAlarmIterator.current().info();
+      triggeredAlarm = currentAlarmIterator.current().info();
       Serial.println("OK: ALARM_TRIGGERED " + String(triggeredAlarm.id()) + " ;");
-      RelayOperate( triggeredAlarm.relayNumber(), triggeredAlarm.relayStatus() );
 
-      if ( ! triggeredAlarm.isRepeat() )  {
-        alarmList.remove( currentAlarmIterator.current().info() );
-        currentAlarmIterator = alarmList.begin();
-      }else {
-        currentAlarmIterator++;
-      }
+      RelayOperate( 1, triggeredAlarm.relay1());
+      RelayOperate( 2, triggeredAlarm.relay2());
+      RelayOperate( 3, triggeredAlarm.relay3());
+      RelayOperate( 4, triggeredAlarm.relay4());
 
-    } while ( currentAlarmIterator != NULL && triggeredAlarm.isSameTime( currentAlarmIterator.current().info() ));
+      if ( ! triggeredAlarm.repeat() )  RemoveAlarm( triggeredAlarm.id() );
 
+      currentAlarmIterator++;
+
+    } while (currentAlarmIterator.current().info() != NULL && triggeredAlarm.isSameTime( currentAlarmIterator.current().info() ));
 
     UpdateAlarm2RegisterOfRTC();
     SleepNow();
@@ -81,13 +78,13 @@ void serialEvent()                                        //  Called when data i
       ClockSet( receivedBluetoothData.substring(3, receivedBluetoothData.indexOf(" ;")) );              //  ClockSet( DateTime )
 
     else if ( receivedBluetoothData.startsWith("ro"))
-      RelayOperate( (receivedBluetoothData.charAt(3) - '0'), (receivedBluetoothData.charAt(5) - '0') ); //  RelayOperate( relayNumber, relayStatus )
+      RelayOperate( (receivedBluetoothData.charAt(3) - '0'), (receivedBluetoothData.charAt(5) - '0') ); //  RelayOperate( relayNumber, relayStatus );
 
     else if ( receivedBluetoothData.startsWith("rs"))
       RelaysStatus();
 
     else if ( receivedBluetoothData.startsWith("as"))
-      AlarmSet( receivedBluetoothData.substring(3, receivedBluetoothData.indexOf(" ;")) );               //  AlarmSet( AlarmDescription );
+      AlarmSet( receivedBluetoothData.substring(3, receivedBluetoothData.indexOf(" ;")).toInt() );               //  AlarmSet( AlarmDescription );
 
     else if ( receivedBluetoothData.startsWith("ad"))
       AlarmDisarm( receivedBluetoothData.substring(2, receivedBluetoothData.indexOf(" ;")).toInt() );    //  AlarmDisarm( alarmId );
@@ -103,7 +100,6 @@ void serialEvent()                                        //  Called when data i
 
   SleepNow();
 }//end serialEvent()
-
 
 void SetInterruptPin2ForRTC()
 {
@@ -138,8 +134,7 @@ void SleepNow()
 
 
 /***************                Relay                ***************/
-void SetRelayModule()
-{
+void SetRelayModule() {
   module[1].setPinNumber(7).setPinMode(OUTPUT);       //  Relay1 (IN1) is connected to the Arduino's digital pin 7.
   module[2].setPinNumber(6).setPinMode(OUTPUT);       //  Relay2 (IN2) is connected to the Arduino's digital pin 6.
   module[3].setPinNumber(5).setPinMode(OUTPUT);       //  Relay3 (IN3) is connected to the Arduino's digital pin 5.
@@ -149,21 +144,28 @@ void SetRelayModule()
 
 void RelayOperate( uint8_t relayNumber, uint8_t relayStatus )
 {
-  if ( relayStatus )
-  {
-    if ( module.activate( relayNumber ) )   {   Serial.println("OK: RELAY_OPERATE " + String(relayNumber) + " ACTIVE ;");      }
-    else                                    {   Serial.println("ERROR: RELAY_OPERATE " + String(relayNumber) + " ;");   }
-  }
-  else
-  {
-    if ( module.deactivate( relayNumber ) ) {   Serial.println("OK: RELAY_OPERATE " + String(relayNumber) + " DEACTIVE ;");      }
-    else                                    {   Serial.println("ERROR: RELAY_OPERATE " + String(relayNumber) + " ;");   }
-  }
+  if ( relayStatus == 0 )        RelayOff    ( relayNumber );
+  else if ( relayStatus == 1 )   RelayOn     ( relayNumber );
+  else if ( relayStatus == 2 )   RelayToggle ( relayNumber );
+  else if ( relayStatus == 3 )   Serial.println("OK: RELAY_OPERATE " + String(relayNumber) + " DONT_CARE ;");
 
 }//end RelayOperate()
 
-void RelaysStatus()
-{
+void RelayOn( uint8_t relayNumber ) {
+  module.activate( relayNumber ) ?   Serial.println("OK: RELAY_OPERATE " + String(relayNumber) + " ACTIVE ;") :
+  Serial.println("ERROR: RELAY_OPERATE " + String(relayNumber) + " ACTIVE ;");
+}
+
+void RelayOff( uint8_t relayNumber ) {
+  module.deactivate( relayNumber ) ? Serial.println("OK: RELAY_OPERATE " + String(relayNumber) + " DEACTIVE ;") :
+  Serial.println("ERROR: RELAY_OPERATE " + String(relayNumber) + " DEACTIVE ;");
+}
+
+void RelayToggle( uint8_t relayNumber ) {
+  module[relayNumber].getStatus() ? RelayOff( relayNumber ) : RelayOn( relayNumber );
+}
+
+void RelaysStatus() {
   Serial.println("OK: RELAYS_STATUS " + String(module.getStatus()) + " ;" );
 }
 
@@ -172,32 +174,24 @@ void RelaysStatus()
 
 
 /***************                Peripheral                ***************/
-void PeripheralGet()
-{
+void PeripheralGet() {
   String feeder =   String(module.getStatus())  + " " +
                     TemperatureValue()          + " " +
                     CurrentValue()              + " " +
                     VoltageValue()              ;
 
-  Serial.println("OK: PERIPHERAL_GET "+ feeder +" ;" );
+  Serial.println("OK: PERIPHERAL_GET " + feeder + " ;" );
 }//end PeripheralGet()
 
-String TemperatureValue()
-{
+String TemperatureValue() {
   return String( analogRead(ARDUINO_ANALOG_TEMPERATURE) );
 }
-
-String CurrentValue()
-{
+String CurrentValue()     {
   return String ( analogRead(ARDUINO_ANALOG_CURRENT) );
 }
-
-String VoltageValue()
-{
+String VoltageValue()     {
   return String( SmoothVoltageCalculation() );
 }
-
-
 
 //  Reads eight times the voltage value from Arduino Analog Pin 4 in every 50 ms and then returns the average of total measurement.
 float SmoothVoltageCalculation()
@@ -231,12 +225,13 @@ void SetDefaultValuesOfRTC()
   RTC.squareWave(SQWAVE_NONE);
 }
 
-void SetAlarm2Register (uint8_t minute, uint8_t hour, uint8_t daydate)
+void SetAlarm2Register (uint8_t minute, uint8_t hour, uint8_t dayOfWeek)
 {
-  RTC.setAlarm(ALM2_MATCH_DAY, minute, hour , daydate);   //  Causes an alarm when the day of the week and hours and minutes match.
+  RTC.setAlarm(ALM2_MATCH_DAY, minute, hour , dayOfWeek);   //  Causes an alarm when the day of the week and hours and minutes match.
   RTC.alarm(ALARM_2);                                     //  Clears the ALARM_2 flag. ( ALARM_2 flag is set when RTC produces an interrupt. )
   RTC.alarmInterrupt(ALARM_2, true);                      //  When the day of the week and hours and minutes match, RTC will produce an interrupt.
-  Serial.println("OK: ALARM_SET ;" );
+
+  Serial.println("OK: ALARM_SET " + String(dayOfWeek) + ":" + String(hour) + ":" + String(minute));
 }
 
 //  Format of DateTime  =   "2018 01 01 00 00 00"
@@ -247,12 +242,12 @@ time_t DateTimeAsSeconds(String& DateTime)
   uint16_t parameters[6];
   size_t start = 0;
   size_t end = DateTime.indexOf(delimiter);
-  for(int i=0; i<6; i++)
+  for (int i = 0; i < 6; i++)
   {
-      parameters[i] = (DateTime.substring(start, end)).toInt();
+    parameters[i] = (DateTime.substring(start, end)).toInt();
 
-      start = end + 1;
-      end = DateTime.indexOf(delimiter, start);
+    start = end + 1;
+    end = DateTime.indexOf(delimiter, start);
   }
 
   tmElements_t rtcTime;
@@ -270,10 +265,10 @@ void ClockSet( String DateTime )
 {
   bool isSet = RTC.set( DateTimeAsSeconds( DateTime ) );
 
-  if( isSet == 0 )      Serial.println("OK: CLOCK_SET ;");
-  else                  Serial.println("ERROR: CLOCK_SET ;");
+  if ( isSet == 0 )      Serial.println("OK: CLOCK_SET ;");
+  else                   Serial.println("ERROR: CLOCK_SET ;");
 
-  UpdateAlarm2RegisterOfRTC();
+  //  UpdateAlarm2RegisterOfRTC();
 }
 
 void ClockGet()
@@ -287,7 +282,7 @@ void ClockGet()
                     String( rtcTime.Minute      ) + " " +
                     String( rtcTime.Second      ) ;
 
-  Serial.println("OK: CLOCK_GET "+ RTCTime +" ;" );
+  Serial.println("OK: CLOCK_GET " + RTCTime + " ;" );
   //Serial.println("DAY:" + DayDate( rtcTime.Wday ));
 }
 
@@ -316,7 +311,7 @@ String DayDate( int timelibFormatDay )
 
 
 /***************                Alarm                ***************/
-void AlarmSet( String alarmDescription )
+void AlarmSet( uint32_t alarmDescription )
 {
   AlarmTask newAlarm ( alarmDescription );
   alarmList.push_sorted( newAlarm );
@@ -326,11 +321,15 @@ void AlarmSet( String alarmDescription )
 
 void AlarmDisarm( uint8_t alarmId )
 {
-  AlarmTask tempAlarm( alarmId );
-  if( alarmList.remove( tempAlarm ) )   Serial.println("OK: ALARM_DISARM " + String(alarmId) + " ;" );
-  else                                  Serial.println("ERROR: ALARM_DISARM " + String(alarmId) + " ;" );
+  if ( RemoveAlarm( alarmId ))           Serial.println("OK: ALARM_DISARM " + String(alarmId) + " ;" );
+  else                                   Serial.println("ERROR: ALARM_DISARM " + String(alarmId) + " ;" );
+}
 
-  UpdateAlarm2RegisterOfRTC();
+bool RemoveAlarm( uint8_t alarmId )
+{
+  AlarmTask tempAlarm( 0 );
+  tempAlarm.setId( alarmId );
+  return ( alarmList.remove( tempAlarm )) ? true : false;
 }
 
 void AlarmList()
@@ -339,24 +338,42 @@ void AlarmList()
 
   SinglyLinkedList<AlarmTask>::iterator it;
   for ( it = alarmList.begin();  it.position() < alarmList.size(); it++  )
-    Serial.println("OK: ALARM_LIST_ITEM " + it.current().info().getDescription() );
-
+    Serial.println("OK: ALARM_LIST_ITEM " + String(it.current().info().getAlarm()) + " ;" );
 }
 
 void alarmFunction() {}
 
 void UpdateAlarm2RegisterOfRTC()
 {
-  if( alarmList.size() == 0 ){
+  if ( alarmList.size() == 0 ) {
     currentAlarmIterator = NULL;
     SetDefaultValuesOfRTC();
+    Serial.println("alarmList.size() == 0, currentAlarmIterator is set to NULL");
   }
-  else{
+  else if ( alarmList.size() == 1 || currentAlarmIterator == alarmList.end())
     currentAlarmIterator = alarmList.begin();
+
+  else {
     AlarmTask& firstAlarm = currentAlarmIterator.current().info();
-    SetAlarm2Register( firstAlarm.minute(),  firstAlarm.hour(), castDayToTimelibFormat(firstAlarm.day()) );
+    SetAlarm2Register( firstAlarm.minute(),  firstAlarm.hour(), castDayToTimelibFormat(firstAlarm.dayWeek()) );
   }
 }
+
+
+uint16_t castTimeLibFormatToDay(uint16_t timeLibFormatDay)    {
+  return ( timeLibFormatDay == 1 ) ? 7 : timeLibFormatDay - 1;
+}
+uint16_t castDayToTimelibFormat(uint16_t day )                {
+  return ( day == 7 ) ? 1 : day + 1;
+}
+
+
+//  cs 2018 9 3 12 29 0 ;
+//  as 0 0 1 12 30 1 1 ;
+//  as 1 0 1 12 30 3 1 ;
+//  as 3 1 1 12 30 4 1 ;
+//  as 4 1 4 12 30 2 0 ;
+
 
 /*
   In Turkey, week starts from Monday. We need to cast Turkey standart to the Timelib format.
@@ -377,13 +394,4 @@ void UpdateAlarm2RegisterOfRTC()
 
   According to the Timelib.h, week starts from Sunday, but here In Turkey, week starts from Monday.
   We need to switch between these two formats. Because, RTC will be programmed in Timelib.h format.
- */
-uint16_t castDayToTimelibFormat( uint16_t day )
-{
-    return ( day == 7 ) ? 1 : day + 1;
-}
-
-
-//  cs 2018 9 3 12 29 0 ;
-//  as 0 0 1 12 30 1 1 ;
-
+*/
