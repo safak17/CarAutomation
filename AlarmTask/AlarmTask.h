@@ -2,23 +2,23 @@
 #define ALARMTASK_H
 
 /*                MASKS                 */
-#define MASK_ALARM_ID           0xFE000000
-#define MASK_ENABLE             0x01000000
+#define MASK_ALARM_ID           0xFF000000      //  8 bit
 
-#define MASK_RELAY_4            0x00C00000
-#define MASK_RELAY_3            0x00300000
-#define MASK_RELAY_2            0x000C0000
-#define MASK_RELAY_1            0x00030000
+#define MASK_RELAY_4            0x00C00000      //  2 bit
+#define MASK_RELAY_3            0x00300000      //  2 bit
+#define MASK_RELAY_2            0x000C0000      //  2 bit
+#define MASK_RELAY_1            0x00030000      //  2 bit
 
-#define MASK_REPEAT             0x0000C000
-#define MASK_MINUTE             0x00003F00
-#define MASK_HOUR               0x000000F8
-#define MASK_DAY_OF_WEEK        0x00000007
+#define MASK_REPEAT             0x0000C000      //  2 bit
+#define MASK_DAY_OF_WEEK        0x00003800      //  3 bit
+#define MASK_HOUR               0x000007C0      //  5 bit
+#define MASK_MINUTE             0x0000003F      //  6 bit
+
+#define MASK_DAY_TIME           0x000004FF
 
 
-/*              DIGIT_VALUE           */
-#define DIGIT_VALUE_ID          0x02000000
-#define DIGIT_VALUE_ENABLE      0x01000000
+/*              DIGIT_VALUE             */
+#define DIGIT_VALUE_ID          0x01000000
 
 #define DIGIT_VALUE_RELAY_4     0x00400000
 #define DIGIT_VALUE_RELAY_3     0x00100000
@@ -26,26 +26,22 @@
 #define DIGIT_VALUE_RELAY_1     0x00010000
 
 #define DIGIT_VALUE_REPEAT      0x00004000
-#define DIGIT_VALUE_MINUTE      0x00000100
-#define DIGIT_VALUE_HOUR        0x00000008
-#define DIGIT_VALUE_DAY_OF_WEEK 0x00000001
+#define DIGIT_VALUE_DAY_OF_WEEK 0x00000800
+#define DIGIT_VALUE_HOUR        0x00000040
+#define DIGIT_VALUE_MINUTE      0x00000001
 
 //  typedef enum { NO_REPEAT, EVERY_DAY, EVERY_WEEK, INVALID } enumRepeat_t;
 //  typedef enum { DONT_CARE, ON, OFF, TOGGLE } enumRelayStatus_t;
 
 class AlarmTask{
 private:
-    
     uint32_t alarm;
     uint32_t onesComplement(uint32_t number){ return (0xFFFFFFFF - number) ;}
+    
 public:
-    
-    
-    
     AlarmTask (uint32_t alarmDescription ):alarm(alarmDescription){}
-    uint32_t getAlarm()      const   {  return alarm; }
+    uint32_t alarm()         const   {  return alarm; }
     uint16_t id()            const   {  return ( alarm & MASK_ALARM_ID  ) / DIGIT_VALUE_ID ; }
-    uint16_t isEnable()      const   {  return ( alarm & MASK_ENABLE    ) / DIGIT_VALUE_ENABLE ; }
     
     uint16_t relay4()        const   {  return ( alarm & MASK_RELAY_4   ) / DIGIT_VALUE_RELAY_4 ; }
     uint16_t relay3()        const   {  return ( alarm & MASK_RELAY_3   ) / DIGIT_VALUE_RELAY_3 ; }
@@ -53,9 +49,9 @@ public:
     uint16_t relay1()        const   {  return ( alarm & MASK_RELAY_1   ) / DIGIT_VALUE_RELAY_1 ; }
     
     uint16_t repeat()        const   {  return ( alarm & MASK_REPEAT    ) / DIGIT_VALUE_REPEAT ; }
-    uint16_t minute()        const   {  return ( alarm & MASK_MINUTE    ) / DIGIT_VALUE_MINUTE ; }
+    uint16_t dayWeek()       const   {  return ( alarm & MASK_DAY_OF_WEEK)/ DIGIT_VALUE_DAY_OF_WEEK ; }
     uint16_t hour()          const   {  return ( alarm & MASK_HOUR      ) / DIGIT_VALUE_HOUR ; }
-    uint16_t dayWeek()     const   {  return ( alarm & MASK_DAY_OF_WEEK)/ DIGIT_VALUE_DAY_OF_WEEK ; }
+    uint16_t minute()        const   {  return ( alarm & MASK_MINUTE    ) / DIGIT_VALUE_MINUTE ; }
     
     
     void setAlarm(uint32_t alarm){
@@ -65,10 +61,6 @@ public:
     void setId( uint16_t id ) {
         alarm &= onesComplement( MASK_ALARM_ID );       //  Previous id is cleared.
         alarm += id * DIGIT_VALUE_ID;                   //  The new one is set.
-    }
-    void setEnable( uint16_t enable ) {
-        alarm &= onesComplement( MASK_ENABLE );
-        alarm += enable * DIGIT_VALUE_ENABLE;
     }
     
     
@@ -97,29 +89,34 @@ public:
         alarm &= onesComplement( MASK_REPEAT );
         alarm += repeat * DIGIT_VALUE_REPEAT;
     }
-    void setMinute(uint16_t minute){
-        alarm &= onesComplement( MASK_MINUTE );
-        alarm += minute * DIGIT_VALUE_MINUTE;
+    void setDayOfWeek(uint16_t dayWeek){
+        alarm &= onesComplement( MASK_DAY_OF_WEEK );
+        alarm += dayWeek * DIGIT_VALUE_DAY_OF_WEEK;
+    }
+    void increaseDayByOne(){
+        uint16_t increasedDay = (dayWeek() % 7) + 1;
+        setDayOfWeek( increasedDay );
     }
     void setHour(uint16_t hour){
         alarm &= onesComplement( MASK_HOUR );
         alarm += hour * DIGIT_VALUE_HOUR;
     }
-    void setDayOfWeek(uint16_t dayWeek){
-        alarm &= onesComplement( MASK_DAY_OF_WEEK );
-        alarm += dayWeek * DIGIT_VALUE_DAY_OF_WEEK;
+    void setMinute(uint16_t minute){
+        alarm &= onesComplement( MASK_MINUTE );
+        alarm += minute * DIGIT_VALUE_MINUTE;
     }
+
     
     
     bool operator< (const AlarmTask& rhs) const {
-        int rhsDayTime = rhs.dayWeek() * 4 + rhs.hour() * 2 + rhs.minute();
-        int lhsDayTime = dayWeek() * 4 + hour() * 2 + minute();
+        uint16_t rhsDayTime = rhs.alarm() & MASK_DAY_TIME;
+        uint16_t lhsDayTime = alarm & MASK_DAY_TIME;
         return ( lhsDayTime < rhsDayTime );
     }
     
     bool operator<= (const AlarmTask& rhs) const {
-        int rhsDayTime = rhs.dayWeek() * 4 + rhs.hour() * 2 + rhs.minute();
-        int lhsDayTime = dayWeek() * 4 + hour() * 2 + minute();
+        uint16_t rhsDayTime = rhs.alarm() & MASK_DAY_TIME;
+        uint16_t lhsDayTime = alarm & MASK_DAY_TIME;
         return ( lhsDayTime <= rhsDayTime );
     }
     
@@ -140,23 +137,21 @@ public:
     }
     
     bool isSameTime(const AlarmTask& rhs) const{
-        int rhsDayTime = rhs.dayWeek() * 4 + rhs.hour() * 2 + rhs.minute();
-        int lhsDayTime = dayWeek() * 4 + hour() * 2 + minute();
+        uint16_t rhsDayTime = rhs.alarm() & MASK_DAY_TIME;
+        uint16_t lhsDayTime = alarm & MASK_DAY_TIME;
         return ( lhsDayTime == rhsDayTime );
     }
     
-    String getDescription()
-    {
+    String descriptionAsString(){
         return ("id: " +        String( id()                ) + " " +
-                "isEnable: " +  String( isEnable()          ) + " " +
                 "relay4: " +    String( relay4()            ) + " " +
                 "relay3: " +    String( relay3()            ) + " " +
                 "relay2: " +    String( relay2()            ) + " " +
                 "relay1: " +    String( relay1()            ) + " " +
                 "repeat: " +    String( repeat()            ) + " " +
-                "minute: " +    String( minute()            ) + " " +
+                "dayWeek: " +   String( dayWeek()           ) + " " +
                 "hour: " +      String( hour()              ) + " " +
-                "dayWeek: " +   String( dayWeek()           ));
+                "minute: " +    String( minute()            ));
     }
     
     
