@@ -18,10 +18,9 @@ RelayModule module(4, LOW);                                         //  It is a 
 #define ARDUINO_ANALOG_VOLTAGE              4                       //  Voltage value     will be read from Arduino's Analog Pin 4.
 #define SMOOTH_CALCULATION_FREQUENCY_NUMBER 8                       //  Reads eight times the voltage value from Arduino Analog Pin 4 in every 50 ms and then returns the average of total measurement.
 
-String receivedBluetoothData = "";                                  //  To hold the data which is sent by Android.
+String receivedBluetoothData = "";                                  //  To hold the data sent by Android.
 
-void setup()
-{
+void setup(){
   Serial.begin(9600);                                               //  Arduino's baud rate is set to 9600.
   BluetoothSerial.begin(9600);                                      //  HC-05's (BluetoothModule) baud rate is set to 9600.
   analogReference(DEFAULT);                                         //  Configures the reference voltage used for analog input, Arduino Uno 5V
@@ -35,9 +34,9 @@ void setup()
   SleepNow();
 }
 
-AlarmTask triggeredAlarm(1);
-void loop()
-{
+
+AlarmTask triggeredAlarm(0);
+void loop(){
   if ( RTC.alarm( ALARM_2 ) ) //  If Real Time Clock produces an interrupt because of ALARM_2 register.
   {
     do
@@ -50,16 +49,48 @@ void loop()
       RelayOperate( 3, triggeredAlarm.relay3());
       RelayOperate( 4, triggeredAlarm.relay4());
 
-      if ( ! triggeredAlarm.repeat() )  RemoveAlarm( triggeredAlarm.id() );
+      if      ( triggeredAlarm.repeat() == 0 )      //  triggeredAlarm does not repeat.
+        AlarmRemove( triggeredAlarm.id() );
+      
+      else if( triggeredAlarm.repeat() == 1 ){      //
+        AlarmRemove( triggeredAlarm.id() );         //  Remove the old alarm.
+        AlarmTask newAlarm( currentAlarmIterator.current().info().getAlarm() );
+        newAlarm.increaseDayByOne();                //  Update the alarm.
+        AlarmAdd( newAlarm.getAlarm() );            //  Add new alarm.
+      }
 
-      currentAlarmIterator++;
+      UpdateCurrentAlarmIterator();
 
-    } while (currentAlarmIterator.current().info() != NULL && triggeredAlarm.isSameTime( currentAlarmIterator.current().info() ));
+    } while (alarmList.size() != 0 && triggeredAlarm.isSameTime( currentAlarmIterator.current().info()));
 
     UpdateAlarm2RegisterOfRTC();
     SleepNow();
   }// if ( RTC.alarm( ALARM_2 ) )
 }// loop()
+
+void UpdateCurrentAlarmIterator(){
+    if ( alarmList.size() == 0 ) 
+        currentAlarmIterator = NULL;
+        
+    else if ( alarmList.size() == 1)
+        currentAlarmIterator = alarmList.begin();
+    
+    else{
+        
+        int now = 11008; //    RTCDayTime();
+        
+        SinglyLinkedList<AlarmTask>::iterator it;
+        it = alarmList.begin();
+        
+        while( it.valid() && it.current().info().dayTime() < now )
+            it++;
+        
+        if( it.valid() )
+            currentAlarmIterator = it;
+        else
+            currentAlarmIterator = NULL;
+    }
+}
 
 
 void serialEvent()                                        //  Called when data is available.                          https://www.arduino.cc/en/Reference/SerialEvent
@@ -68,6 +99,7 @@ void serialEvent()                                        //  Called when data i
 
   while ( receivedBluetoothData.endsWith(" ;") )          //  There can be many commands in the buffer.
   {
+
     if ( receivedBluetoothData.startsWith("pg"))
       PeripheralGet();
 
@@ -83,11 +115,14 @@ void serialEvent()                                        //  Called when data i
     else if ( receivedBluetoothData.startsWith("rs"))
       RelaysStatus();
 
-    else if ( receivedBluetoothData.startsWith("as"))
-      AlarmSet( receivedBluetoothData.substring(3, receivedBluetoothData.indexOf(" ;")).toInt() );               //  AlarmSet( AlarmDescription );
+    else if ( receivedBluetoothData.startsWith("aa"))
+      AlarmAdd( receivedBluetoothData.substring(3, receivedBluetoothData.indexOf(" ;")).toInt() );      //  AlarmSet( AlarmDescription );
 
-    else if ( receivedBluetoothData.startsWith("ad"))
-      AlarmDisarm( receivedBluetoothData.substring(2, receivedBluetoothData.indexOf(" ;")).toInt() );    //  AlarmDisarm( alarmId );
+    else if ( receivedBluetoothData.startsWith("ar"))
+      AlarmRemove( receivedBluetoothData.substring(3, receivedBluetoothData.indexOf(" ;")).toInt() );   //  AlarmDisarm( alarmId );
+
+    else if ( receivedBluetoothData.startsWith("as"))
+      AlarmSet( receivedBluetoothData.substring(3, receivedBluetoothData.indexOf(" ;")).toInt() );      //  AlarmSet( alarmId );
 
     else if ( receivedBluetoothData.startsWith("al"))
       AlarmList();
@@ -101,14 +136,12 @@ void serialEvent()                                        //  Called when data i
   SleepNow();
 }//end serialEvent()
 
-void SetInterruptPin2ForRTC()
-{
+void SetInterruptPin2ForRTC(){
   pinMode(2, INPUT_PULLUP);
   attachInterrupt( digitalPinToInterrupt( 2 ), alarmFunction, CHANGE );
 }
 
-void SleepNow()
-{
+void SleepNow(){
   delay(200);
   set_sleep_mode(SLEEP_MODE_IDLE);  //  Sleep Mode is set to SLEEP_MODE_IDLE
   sleep_enable();                   //  Enables the sleep bit in the mcucr register
@@ -142,13 +175,11 @@ void SetRelayModule() {
   module.deactivateAll();                             //  At the beginning, deactivates all the relays.
 }
 
-void RelayOperate( uint8_t relayNumber, uint8_t relayStatus )
-{
+void RelayOperate( uint8_t relayNumber, uint8_t relayStatus ){
   if ( relayStatus == 0 )        RelayOff    ( relayNumber );
   else if ( relayStatus == 1 )   RelayOn     ( relayNumber );
   else if ( relayStatus == 2 )   RelayToggle ( relayNumber );
   else if ( relayStatus == 3 )   Serial.println("OK: RELAY_OPERATE " + String(relayNumber) + " DONT_CARE ;");
-
 }//end RelayOperate()
 
 void RelayOn( uint8_t relayNumber ) {
@@ -194,8 +225,7 @@ String VoltageValue()     {
 }
 
 //  Reads eight times the voltage value from Arduino Analog Pin 4 in every 50 ms and then returns the average of total measurement.
-float SmoothVoltageCalculation()
-{
+float SmoothVoltageCalculation(){
   float total = 0;
 
   for ( int i = 0; i < SMOOTH_CALCULATION_FREQUENCY_NUMBER; ++i)      // ++i,   increases i and returns i.
@@ -213,8 +243,7 @@ float SmoothVoltageCalculation()
 
 
 /***************                RealTimeClock                ***************/
-void SetDefaultValuesOfRTC()
-{
+void SetDefaultValuesOfRTC(){
   //  void DS3232RTC::setAlarm(ALARM_TYPES_t alarmType, byte minutes, byte hours, byte daydate)
   RTC.setAlarm(ALM1_MATCH_DAY, 0, 0, 0, 1);
   RTC.setAlarm(ALM2_MATCH_DAY, 0, 0, 0, 1);
@@ -225,9 +254,8 @@ void SetDefaultValuesOfRTC()
   RTC.squareWave(SQWAVE_NONE);
 }
 
-void SetAlarm2Register (uint8_t minute, uint8_t hour, uint8_t dayOfWeek)
-{
-  RTC.setAlarm(ALM2_MATCH_DAY, minute, hour , dayOfWeek);   //  Causes an alarm when the day of the week and hours and minutes match.
+void SetAlarm2Register (uint8_t minute, uint8_t hour, uint8_t dayOfWeek){
+  RTC.setAlarm(ALM2_MATCH_DAY, minute, hour , dayOfWeek); //  Causes an alarm when the day of the week and hours and minutes match.
   RTC.alarm(ALARM_2);                                     //  Clears the ALARM_2 flag. ( ALARM_2 flag is set when RTC produces an interrupt. )
   RTC.alarmInterrupt(ALARM_2, true);                      //  When the day of the week and hours and minutes match, RTC will produce an interrupt.
 
@@ -235,8 +263,7 @@ void SetAlarm2Register (uint8_t minute, uint8_t hour, uint8_t dayOfWeek)
 }
 
 //  Format of DateTime  =   "2018 01 01 00 00 00"
-time_t DateTimeAsSeconds(String& DateTime)
-{
+time_t DateTimeAsSeconds(String& DateTime){
   String delimiter = " ";   //  Space is the indicator between parameters.
 
   uint16_t parameters[6];
@@ -261,8 +288,8 @@ time_t DateTimeAsSeconds(String& DateTime)
   return makeTime( rtcTime );
 }
 
-void ClockSet( String DateTime )
-{
+//  cs 2018 9 3 12 29 0 ;
+void ClockSet( String DateTime ){
   bool isSet = RTC.set( DateTimeAsSeconds( DateTime ) );
 
   if ( isSet == 0 )      Serial.println("OK: CLOCK_SET ;");
@@ -271,8 +298,7 @@ void ClockSet( String DateTime )
   //  UpdateAlarm2RegisterOfRTC();
 }
 
-void ClockGet()
-{
+void ClockGet(){
   tmElements_t  rtcTime;        RTC.read( rtcTime );
 
   String RTCTime =  String( rtcTime.Year + 1970 ) + " " +
@@ -286,15 +312,11 @@ void ClockGet()
   //Serial.println("DAY:" + DayDate( rtcTime.Wday ));
 }
 
-String DayDate( int timelibFormatDay )
-{
-  int dayDate;
 
-  if ( 1 == timelibFormatDay ) dayDate = 7;
-  else                         dayDate = timelibFormatDay - 1;
+String DayDate( uint16_t t ){
+  uint16_t dayDate = castTimeLibFormatToDay( t );
 
-  switch ( dayDate )
-  {
+  switch ( dayDate ){
     case 0:   return "Invalid";
     case 1:   return "Monday";
     case 2:   return "Tuesday";
@@ -306,34 +328,42 @@ String DayDate( int timelibFormatDay )
   }
 }
 
+int RTCDayTime(){
+  tmElements_t  rtcTime;        RTC.read( rtcTime );
+  int day = castTimeLibFormatToDay(rtcTime.Day);
+  int hour = rtcTime.Hour;
+  int minute = rtcTime.Minute;
+
+  return (day *  2048) + (hour * 64) + (minute);
+}
+
 
 
 
 
 /***************                Alarm                ***************/
-void AlarmSet( uint32_t alarmDescription )
-{
+void AlarmAdd( uint32_t alarmDescription ){
   AlarmTask newAlarm ( alarmDescription );
   alarmList.push_sorted( newAlarm );
-
-  UpdateAlarm2RegisterOfRTC();
 }
 
-void AlarmDisarm( uint8_t alarmId )
-{
-  if ( RemoveAlarm( alarmId ))           Serial.println("OK: ALARM_DISARM " + String(alarmId) + " ;" );
-  else                                   Serial.println("ERROR: ALARM_DISARM " + String(alarmId) + " ;" );
-}
-
-bool RemoveAlarm( uint8_t alarmId )
-{
+void AlarmSet( uint8_t alarmId){
   AlarmTask tempAlarm( 0 );
   tempAlarm.setId( alarmId );
-  return ( alarmList.remove( tempAlarm )) ? true : false;
+  currentAlarmIterator = alarmList.find(tempAlarm);
+
+  AlarmTask& firstAlarm = currentAlarmIterator.current().info();
+  SetAlarm2Register( firstAlarm.minute(),  firstAlarm.hour(), castDayToTimelibFormat(firstAlarm.dayWeek()) );
 }
 
-void AlarmList()
-{
+void AlarmRemove( uint8_t alarmId ){
+  AlarmTask tempAlarm( 0 );
+  tempAlarm.setId( alarmId );
+  if ( alarmList.remove( tempAlarm ))   Serial.println("OK: ALARM_REMOVE " + String(alarmId) + " ;" );
+  else                                  Serial.println("ERROR: ALARM_REMOVE " + String(alarmId) + " ;" );
+}
+
+void AlarmList(){
   Serial.println("OK: ALARM_LIST_SIZE " + String( alarmList.size()) + " ;");
 
   SinglyLinkedList<AlarmTask>::iterator it;
@@ -343,22 +373,14 @@ void AlarmList()
 
 void alarmFunction() {}
 
-void UpdateAlarm2RegisterOfRTC()
-{
-  if ( alarmList.size() == 0 ) {
-    currentAlarmIterator = NULL;
-    SetDefaultValuesOfRTC();
-    Serial.println("alarmList.size() == 0, currentAlarmIterator is set to NULL");
-  }
-  else if ( alarmList.size() == 1 || currentAlarmIterator == alarmList.end())
-    currentAlarmIterator = alarmList.begin();
-
-  else {
+void UpdateAlarm2RegisterOfRTC(){
+  if ( currentAlarmIterator != NULL){
     AlarmTask& firstAlarm = currentAlarmIterator.current().info();
     SetAlarm2Register( firstAlarm.minute(),  firstAlarm.hour(), castDayToTimelibFormat(firstAlarm.dayWeek()) );
   }
+  else
+    SetDefaultValuesOfRTC();
 }
-
 
 uint16_t castTimeLibFormatToDay(uint16_t timeLibFormatDay)    {
   return ( timeLibFormatDay == 1 ) ? 7 : timeLibFormatDay - 1;
@@ -368,24 +390,9 @@ uint16_t castDayToTimelibFormat(uint16_t day )                {
 }
 
 
-//  cs 2018 9 3 12 29 0 ;
-//  as 0 0 1 12 30 1 1 ;
-//  as 1 0 1 12 30 3 1 ;
-//  as 3 1 1 12 30 4 1 ;
-//  as 4 1 4 12 30 2 0 ;
-
 
 /*
-  In Turkey, week starts from Monday. We need to cast Turkey standart to the Timelib format.
-  1 - Monday
-  2 - Tuesday
-  3 - Wednesday
-  4 - Thursday
-  5 - Friday
-  6 - Saturday
-  7 - Sunday
-
-  Below, you see one part of the Timelib library. Here, week starts from Sunday.
+  Below, you see one part of the Timelib library.
   Timelib.h
   typedef enum {
   0           1          2          3           4             5           6           7
@@ -394,4 +401,11 @@ uint16_t castDayToTimelibFormat(uint16_t day )                {
 
   According to the Timelib.h, week starts from Sunday, but here In Turkey, week starts from Monday.
   We need to switch between these two formats. Because, RTC will be programmed in Timelib.h format.
+  1 - Monday
+  2 - Tuesday
+  3 - Wednesday
+  4 - Thursday
+  5 - Friday
+  6 - Saturday
+  7 - Sunday
 */
